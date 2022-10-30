@@ -2,15 +2,13 @@ import React, {Component} from 'react';
 import SpotifyWebApi from 'spotify-web-api-js';
 
 class SearchSpotify extends Component{
-    static CLIENT_ID = "2c7bd7c1873e49d5afb4f45d46de8ea3";
-    static CLIENT_SECRET = "45b68b79d1b04e0e98b965fb000ef276";
-
-    
     state = { query: "" }
 
     accessSpotifyAPI = async (query) => {
         const spotify = new SpotifyWebApi();
-        let token = "----"; //User Token from https://developer.spotify.com/console/post-playlist-tracks/
+        //User Token from https://developer.spotify.com/console/post-playlist-tracks/
+        //user-modify-playback-state for Queue
+        let token = "---";
 
         spotify.setAccessToken(token)
         spotify.searchTracks(query, { limit: 1 }).then(
@@ -18,6 +16,7 @@ class SearchSpotify extends Component{
                 console.log("Search results", data.tracks.items)
                 alert(data.tracks.items[0].name + " by " + data.tracks.items[0].artists[0].name);
                 spotify.addTracksToPlaylist("----", ["spotify:track:"+data.tracks.items[0].id.toString()]); //Playlist ID
+                //spotify.queue(["spotify:track:"+data.tracks.items[0].id.toString()]); //Queue song
             },
             (err) => {
             console.error(err);
