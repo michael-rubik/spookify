@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/spookify/static/css/main.073c9b0a.css",
+    "main.js": "/spookify/static/js/main.c0931128.js",
+    "static/js/787.4fae2beb.chunk.js": "/spookify/static/js/787.4fae2beb.chunk.js",
+    "index.html": "/spookify/index.html",
+    "main.073c9b0a.css.map": "/spookify/static/css/main.073c9b0a.css.map",
+    "main.c0931128.js.map": "/spookify/static/js/main.c0931128.js.map",
+    "787.4fae2beb.chunk.js.map": "/spookify/static/js/787.4fae2beb.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.073c9b0a.css",
+    "static/js/main.c0931128.js"
+  ]
+}
