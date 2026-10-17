@@ -26,6 +26,7 @@ export const Auth = () => {
   const [mode, setMode] = useState<AuthMode>('sign-in')
   const [form, setForm] = useState<FormState>(initialForm)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const updateField =
@@ -37,6 +38,7 @@ export const Auth = () => {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError('')
+    setMessage('')
 
     const cleanedEmail = form.email.trim()
 
@@ -52,7 +54,7 @@ export const Auth = () => {
         const cleanedName = form.name.trim()
         const cleanedCostume = form.costume.trim()
 
-        const { data, error: signUpError } = await supabase.auth.signUp({
+        const { error: signUpError } = await supabase.auth.signUp({
           email: cleanedEmail,
           password: form.password,
           options: {
@@ -67,40 +69,32 @@ export const Auth = () => {
           throw signUpError
         }
 
-        if (data.user) {
-          const { error: profileError } = await supabase.from('users').upsert(
-            {
-              id: data.user.id,
-              name: cleanedName,
-              costume: cleanedCostume,
-              email: cleanedEmail,
-            },
-            { onConflict: 'id' },
-          )
-
-          if (profileError) {
-            throw profileError
-          }
-        }
-
         setForm(initialForm)
         setMode('sign-in')
-        setError('')
+        setMessage('Account created. Please check your email and confirm it before signing in.')
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: form.email.trim(),
+          email: cleanedEmail,
           password: form.password,
         })
 
         if (signInError) {
           throw signInError
         }
+
+        setMessage('Signed in successfully.')
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong.'
+      const lowerMessage = message.toLowerCase()
 
-      if (message.toLowerCase().includes('rate limit')) {
+      if (lowerMessage.includes('rate limit')) {
         setError('Too many signup attempts. Please wait a few minutes and use a valid email address you can access.')
+        return
+      }
+
+      if (lowerMessage.includes('not confirmed') || lowerMessage.includes('email not confirmed')) {
+        setError('Please confirm your email before signing in. Check your inbox for the confirmation link.')
         return
       }
 
@@ -169,6 +163,7 @@ export const Auth = () => {
         />
 
         {error && <p role="alert" style={{ color: '#ffb4b4', margin: 0 }}>{error}</p>}
+        {message && <p role="status" style={{ color: '#b7f7c7', margin: 0 }}>{message}</p>}
 
         {mode === 'sign-up' && (
           <div style={{ fontSize: '0.8rem', color: '#666', textAlign: 'left' }}>
@@ -181,7 +176,14 @@ export const Auth = () => {
         </button>
       </form>
 
-      <button type="button" onClick={() => setMode((current) => (current === 'sign-up' ? 'sign-in' : 'sign-up'))}>
+      <button
+        type="button"
+        onClick={() => {
+          setMode((current) => (current === 'sign-up' ? 'sign-in' : 'sign-up'))
+          setError('')
+          setMessage('')
+        }}
+      >
         {mode === 'sign-up' ? 'Already have an account? Sign in' : 'Need an account? Create one'}
       </button>
     </div>
