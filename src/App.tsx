@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { FormEvent, ChangeEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './utils/supabase/supabase-client'
 import './App.css'
@@ -16,6 +17,10 @@ function App() {
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [view, setView] = useState<'profile' | 'users'>('profile')
+  const [costumeDraft, setCostumeDraft] = useState('')
+  const [isSavingCostume, setIsSavingCostume] = useState(false)
+  const [costumeError, setCostumeError] = useState('')
+  const [costumeMessage, setCostumeMessage] = useState('')
 
   useEffect(() => {
     const loadSession = async () => {
@@ -72,6 +77,93 @@ function App() {
   }
 
   const currentUser = users.find((user) => user.id === session?.user.id) ?? null
+
+  useEffect(() => {
+    if (!session) {
+      setCostumeDraft('')
+      setCostumeError('')
+      setCostumeMessage('')
+      return
+    }
+
+    setCostumeDraft(currentUser?.costume ?? '')
+    setCostumeError('')
+    setCostumeMessage('')
+  }, [session, currentUser])
+
+  const handleSaveCostume = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (!session) {
+      return
+    }
+
+    const trimmedCostume = costumeDraft.trim()
+
+    if (!trimmedCostume) {
+      setCostumeError('Please enter a costume before saving.')
+      return
+    }
+
+    setIsSavingCostume(true)
+    setCostumeError('')
+    setCostumeMessage('')
+
+    try {
+      const safeEmail = session.user.email ?? ''
+      const fallbackName = currentUser?.name ?? (safeEmail || 'User')
+
+      const { data, error } = await supabase
+        .from('users')
+        .upsert(
+          {
+            id: session.user.id,
+            name: fallbackName,
+            costume: trimmedCostume,
+            email: safeEmail,
+          },
+          { onConflict: 'id' },
+        )
+        .select()
+        .single()
+
+      if (error) {
+        throw error
+      }
+
+      setUsers((currentUsers) => {
+        const existingIndex = currentUsers.findIndex((user) => user.id === session.user.id)
+
+        if (existingIndex === -1) {
+          return [
+            ...currentUsers,
+            {
+              id: session.user.id,
+              name: data?.name ?? fallbackName,
+              costume: trimmedCostume,
+              email: safeEmail,
+            },
+          ]
+        }
+
+        const nextUsers = [...currentUsers]
+        nextUsers[existingIndex] = {
+          ...nextUsers[existingIndex],
+          costume: trimmedCostume,
+        }
+
+        return nextUsers
+      })
+
+      setCostumeDraft(trimmedCostume)
+      setCostumeMessage('Costume saved successfully.')
+    } catch (error) {
+      console.error('Failed to save costume:', error)
+      setCostumeError('Could not save the costume. Please try again.')
+    } finally {
+      setIsSavingCostume(false)
+    }
+  }
 
   return (
     <div style={{ minHeight: '100vh', padding: '2rem 1rem', fontFamily: 'sans-serif' }}>
@@ -135,16 +227,45 @@ function App() {
         <section style={{ maxWidth: '760px', margin: '0 auto' }}>
           <h2>Profile</h2>
 
-          <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem' }}>
-            <p>
+          <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+            <p style={{ margin: 0 }}>
               <strong>Name:</strong> {currentUser?.name ?? session.user.email}
             </p>
-            <p>
+            <p style={{ margin: 0 }}>
               <strong>Costume:</strong> {currentUser?.costume ?? 'Not set'}
             </p>
-            <p>
+            <p style={{ margin: 0 }}>
               <strong>Email:</strong> {session.user.email}
             </p>
+
+            <form onSubmit={handleSaveCostume} style={{ display: 'grid', gap: '0.75rem' }}>
+              <label htmlFor="costume" style={{ fontWeight: 600 }}>
+                Add or change your costume
+              </label>
+              <input
+                id="costume"
+                type="text"
+                value={costumeDraft}
+                onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                  setCostumeDraft(event.target.value)
+                  if (costumeError) {
+                    setCostumeError('')
+                  }
+                  if (costumeMessage) {
+                    setCostumeMessage('')
+                  }
+                }}
+                placeholder="Enter your costume"
+                style={{ padding: '0.6rem 0.75rem' }}
+              />
+
+              {costumeError && <p role="alert" style={{ color: '#ffb4b4', margin: 0 }}>{costumeError}</p>}
+              {costumeMessage && <p role="status" style={{ color: '#b7f7c7', margin: 0 }}>{costumeMessage}</p>}
+
+              <button type="submit" disabled={isSavingCostume}>
+                {isSavingCostume ? 'Saving...' : 'Save costume'}
+              </button>
+            </form>
           </div>
         </section>
       )}
