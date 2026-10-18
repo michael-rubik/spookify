@@ -20,6 +20,20 @@ const initialForm: FormState = {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+const getCanonicalAppUrl = () => {
+  const configuredUrl = import.meta.env.VITE_SITE_URL || import.meta.env.VITE_APP_URL
+
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/+$/, '')
+  }
+
+  if (typeof window !== 'undefined' && window.location.origin) {
+    return window.location.origin.replace(/\/+$/, '')
+  }
+
+  return 'https://spookify-gugu.vercel.app'
+}
+
 const isValidEmail = (value: string) => EMAIL_REGEX.test(value.trim())
 
 export const Auth = () => {
@@ -53,11 +67,13 @@ export const Auth = () => {
       if (mode === 'sign-up') {
         const cleanedName = form.name.trim()
         const cleanedCostume = form.costume.trim()
+        const canonicalAppUrl = getCanonicalAppUrl()
 
         const { error: signUpError } = await supabase.auth.signUp({
           email: cleanedEmail,
           password: form.password,
           options: {
+            emailRedirectTo: `${canonicalAppUrl}/`,
             data: {
               name: cleanedName,
               costume: cleanedCostume,
