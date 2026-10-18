@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getUserBadges } from '../utils/badges'
 import { supabase } from '../utils/supabase/supabase-client'
 
 type ClickerProps = {
@@ -10,16 +11,20 @@ type ClickerProps = {
 export const Clicker = ({ userId, clickCount, onCountChange }: ClickerProps) => {
   const [count, setCount] = useState(clickCount)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [badges, setBadges] = useState<string[]>(getUserBadges(clickCount))
 
   useEffect(() => {
     setCount(clickCount)
+    setBadges(getUserBadges(clickCount))
   }, [clickCount])
 
   const handleClick = async () => {
     const nextCount = count + 1
     const previousCount = count
+    const nextBadges = getUserBadges(nextCount)
 
     setCount(nextCount)
+    setBadges(nextBadges)
     onCountChange?.(nextCount)
     setIsUpdating(true)
 
@@ -28,6 +33,7 @@ export const Clicker = ({ userId, clickCount, onCountChange }: ClickerProps) => 
     if (error) {
       console.error('Failed to save click count:', error)
       setCount(previousCount)
+      setBadges(getUserBadges(previousCount))
       onCountChange?.(previousCount)
     }
 
@@ -38,6 +44,9 @@ export const Clicker = ({ userId, clickCount, onCountChange }: ClickerProps) => 
     <section style={{ maxWidth: '420px', margin: '0 auto', textAlign: 'center' }}>
       <h2>Clicker</h2>
       <p style={{ fontSize: '2rem', margin: '1rem 0' }}>{count}</p>
+      <p style={{ margin: '0 0 1rem', color: badges.includes('clicker') ? '#c7f9cc' : '#ddd' }}>
+        {badges.includes('clicker') ? 'Badge unlocked: clicker' : 'Reach 500 clicks to unlock the clicker badge.'}
+      </p>
       <button type="button" onClick={handleClick} disabled={isUpdating} style={{ fontSize: '1rem', padding: '0.75rem 1.25rem' }}>
         {isUpdating ? 'Saving...' : 'Click me'}
       </button>

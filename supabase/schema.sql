@@ -3,11 +3,17 @@ create table if not exists public.users (
   name text not null,
   costume text not null,
   email text not null unique,
+  avatar_url text,
+  badges text[] not null default '{}',
   is_admin boolean not null default false,
   click_count integer not null default 0,
   signup_email_status text not null default 'not_sent' check (signup_email_status in ('not_sent', 'pending', 'sent', 'failed')),
   created_at timestamptz not null default now()
 );
+
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
 
 alter table public.users enable row level security;
 
@@ -18,12 +24,14 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.users (id, name, costume, email, is_admin, click_count, signup_email_status)
+  insert into public.users (id, name, costume, email, avatar_url, badges, is_admin, click_count, signup_email_status)
   values (
     new.id,
     coalesce(new.raw_user_meta_data ->> 'name', ''),
     coalesce(new.raw_user_meta_data ->> 'costume', ''),
     new.email,
+    null,
+    '{}'::text[],
     false,
     0,
     'not_sent'
@@ -32,6 +40,8 @@ begin
     set name = excluded.name,
         costume = excluded.costume,
         email = excluded.email,
+        avatar_url = coalesce(excluded.avatar_url, public.users.avatar_url),
+        badges = coalesce(excluded.badges, public.users.badges, '{}'::text[]),
         is_admin = coalesce(public.users.is_admin, false),
         click_count = coalesce(public.users.click_count, 0),
         signup_email_status = coalesce(public.users.signup_email_status, 'not_sent');

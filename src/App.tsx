@@ -5,12 +5,15 @@ import { supabase } from './utils/supabase/supabase-client'
 import './App.css'
 import { Auth } from './components/auth'
 import { Clicker } from './components/clicker'
+import { getUserBadges } from './utils/badges'
 
 type UserProfile = {
   id: string
   name: string
   costume: string
   email: string
+  avatar_url: string | null
+  badges: string[]
   is_admin: boolean
   click_count: number
   signup_email_status: string | null
@@ -65,32 +68,6 @@ function App() {
     }
   }, [])
 
-  useEffect(() => {
-    if (!session) {
-      return
-    }
-
-    const loadUsers = async () => {
-      await ensureCurrentUserProfile(session.user)
-
-      setLoadingUsers(true)
-
-      const { data, error } = await supabase.from('users').select('*').order('name', { ascending: true })
-
-      if (error) {
-        console.error('Failed to load users:', error)
-        setUsers([])
-        setLoadingUsers(false)
-        return
-      }
-
-      setUsers((data ?? []) as UserProfile[])
-      setLoadingUsers(false)
-    }
-
-    loadUsers()
-  }, [session])
-
   const ensureCurrentUserProfile = async (user: Session['user']) => {
     if (!user) {
       return
@@ -124,6 +101,8 @@ function App() {
       name: nextName,
       costume: nextCostume,
       email: nextEmail,
+      avatar_url: null,
+      badges: [],
       is_admin: false,
       click_count: 0,
       signup_email_status: 'not_sent',
@@ -133,6 +112,34 @@ function App() {
       console.error('Failed to create current user profile:', insertError)
     }
   }
+
+  useEffect(() => {
+    if (!session) {
+      return
+    }
+
+    const loadUsers = async () => {
+      await ensureCurrentUserProfile(session.user)
+
+      setLoadingUsers(true)
+
+      const { data, error } = await supabase.from('users').select('*').order('name', { ascending: true })
+
+      if (error) {
+        console.error('Failed to load users:', error)
+        setUsers([])
+        setLoadingUsers(false)
+        return
+      }
+
+      setUsers((data ?? []) as UserProfile[])
+      setLoadingUsers(false)
+    }
+
+    loadUsers()
+  }, [session])
+
+  
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()
@@ -148,22 +155,6 @@ function App() {
   const pendingLogins = users.filter((user) => user.signup_email_status === 'pending' || user.signup_email_status === 'not_sent').length
   const verificationLinksSent = users.filter((user) => user.signup_email_status === 'sent').length
 
-  useEffect(() => {
-    if (!session) {
-      setProfileDraft(emptyProfileDraft)
-      setProfileError('')
-      setProfileMessage('')
-      return
-    }
-
-    setProfileDraft({
-      name: currentUser?.name ?? session.user.email ?? '',
-      costume: currentUser?.costume ?? '',
-      email: currentUser?.email ?? session.user.email ?? '',
-    })
-    setProfileError('')
-    setProfileMessage('')
-  }, [session, currentUser])
 
   const handleSaveProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -234,6 +225,63 @@ function App() {
     }
   }
 
+  const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+
+    if (!file || !session) {
+      return
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setProfileError('Please choose a valid image file for your profile picture.')
+      return
+    }
+
+    const safeFileName = `${session.user.id}-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(safeFileName, file, { upsert: true, cacheControl: '3600' })
+
+    if (uploadError) {
+      console.error('Avatar upload failed:', uploadError)
+      setProfileError('Could not upload your profile picture. Please try again.')
+      return
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(uploadData.path)
+    const nextAvatarUrl = publicUrlData.publicUrl
+
+    const { data, error } = await supabase
+      .from('users')
+      .update({ avatar_url: nextAvatarUrl })
+      .eq('id', session.user.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Failed to save avatar URL:', error)
+      setProfileError('Your picture uploaded, but the profile could not be saved.')
+      return
+    }
+
+    const savedUser = data as UserProfile | null
+
+    setUsers((currentUsers) =>
+      currentUsers.map((user) =>
+        user.id === session.user.id
+          ? {
+              ...user,
+              avatar_url: savedUser?.avatar_url ?? nextAvatarUrl,
+            }
+          : user,
+      ),
+    )
+
+    setProfileMessage('Profile picture updated successfully.')
+    setProfileError('')
+  }
+
   const handleToggleAdmin = async (userId: string, currentValue: boolean) => {
     if (!isCurrentUserAdmin) {
       return
@@ -251,6 +299,29 @@ function App() {
     setUsers((currentUsers) =>
       currentUsers.map((user) => (user.id === userId ? { ...user, is_admin: nextValue } : user)),
     )
+  }
+
+  const handleRefreshBadges = async () => {
+    if (!isCurrentUserAdmin) {
+      return
+    }
+
+    const updatedUsers = users.map((user) => ({
+      ...user,
+      badges: getUserBadges(user.click_count, user.badges),
+    }))
+
+    await Promise.all(
+      updatedUsers.map(async (user) => {
+        const { error } = await supabase.from('users').update({ badges: user.badges }).eq('id', user.id)
+
+        if (error) {
+          console.error('Failed to refresh badges for user:', user.id, error)
+        }
+      }),
+    )
+
+    setUsers(updatedUsers)
   }
 
   const handleUpdateSignupStatus = async (userId: string, nextStatus: string) => {
@@ -320,12 +391,28 @@ function App() {
 
   const updateUserCount = (userId: string, nextCount: number) => {
     setUsers((currentUsers) =>
-      currentUsers.map((user) =>
-        user.id === userId
-          ? { ...user, click_count: nextCount }
-          : user,
-      ),
+      currentUsers.map((user) => {
+        if (user.id !== userId) {
+          return user
+        }
+
+        const nextBadges = getUserBadges(nextCount, user.badges)
+
+        return {
+          ...user,
+          click_count: nextCount,
+          badges: nextBadges,
+        }
+      }),
     )
+
+    void supabase
+      .from('users')
+      .update({
+        click_count: nextCount,
+        badges: getUserBadges(nextCount, users.find((user) => user.id === userId)?.badges ?? []),
+      })
+      .eq('id', userId)
   }
 
   return (
@@ -425,6 +512,13 @@ function App() {
                 </div>
               </div>
 
+              <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+                  <h3 style={{ margin: 0 }}>Badge refresh</h3>
+                  <button type="button" onClick={handleRefreshBadges}>Refresh all badges</button>
+                </div>
+              </div>
+
               <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem' }}>
                 <h3 style={{ marginTop: 0 }}>Signup tracking</h3>
                 <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: '0.75rem' }}>
@@ -479,7 +573,31 @@ function App() {
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center' }}>
-                      <strong>{user.name}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        {user.avatar_url ? (
+                          <img
+                            src={user.avatar_url}
+                            alt={`${user.name} avatar`}
+                            style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '50%',
+                              background: '#3d3d3d',
+                              display: 'grid',
+                              placeItems: 'center',
+                              color: '#fff',
+                              fontSize: '0.8rem',
+                            }}
+                          >
+                            {user.name.slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
+                        <strong>{user.name}</strong>
+                      </div>
                       {showAllDetails && (
                         <span
                           style={{
@@ -502,6 +620,9 @@ function App() {
                         <div>{user.costume}</div>
                         <div>{user.email}</div>
                         <div>Clicks: {user.click_count}</div>
+                        <div>
+                          Badges: {user.badges?.length ? user.badges.join(', ') : 'None'}
+                        </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
                           <label htmlFor={`admin-${user.id}`} style={{ fontWeight: 600 }}>
@@ -562,6 +683,38 @@ function App() {
             <p style={{ margin: 0 }}>
               <strong>Click count:</strong> {currentUser?.click_count ?? 0}
             </p>
+            <p style={{ margin: 0 }}>
+              <strong>Badges:</strong> {currentUser?.badges?.length ? currentUser.badges.join(', ') : 'None'}
+            </p>
+
+            {currentUser?.avatar_url ? (
+              <img
+                src={currentUser.avatar_url}
+                alt="Profile avatar"
+                style={{ width: '160px', height: '160px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #2a2a2a' }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '160px',
+                  height: '160px',
+                  borderRadius: '50%',
+                  border: '1px solid #2a2a2a',
+                  display: 'grid',
+                  placeItems: 'center',
+                  background: '#1d1d1d',
+                  color: '#fff',
+                  fontSize: '2rem',
+                }}
+              >
+                {currentUser?.name?.slice(0, 1)?.toUpperCase() ?? 'U'}
+              </div>
+            )}
+
+            <label htmlFor="profile-avatar" style={{ fontWeight: 600 }}>
+              Profile picture
+            </label>
+            <input id="profile-avatar" type="file" accept="image/*" onChange={handleAvatarUpload} />
 
             {currentUser && (
               <p style={{ margin: 0 }}>
