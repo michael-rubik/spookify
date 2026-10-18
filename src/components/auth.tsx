@@ -20,20 +20,6 @@ const initialForm: FormState = {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-const getCanonicalAppUrl = () => {
-  const configuredUrl = import.meta.env.VITE_SITE_URL || import.meta.env.VITE_APP_URL
-
-  if (configuredUrl) {
-    return configuredUrl.replace(/\/+$/, '')
-  }
-
-  if (typeof window !== 'undefined' && window.location.origin) {
-    return window.location.origin.replace(/\/+$/, '')
-  }
-
-  return 'https://spookify-gugu.vercel.app'
-}
-
 const isValidEmail = (value: string) => EMAIL_REGEX.test(value.trim())
 
 export const Auth = () => {
@@ -67,13 +53,11 @@ export const Auth = () => {
       if (mode === 'sign-up') {
         const cleanedName = form.name.trim()
         const cleanedCostume = form.costume.trim()
-        const canonicalAppUrl = getCanonicalAppUrl()
 
         const { error: signUpError } = await supabase.auth.signUp({
           email: cleanedEmail,
           password: form.password,
           options: {
-            emailRedirectTo: `${canonicalAppUrl}/`,
             data: {
               name: cleanedName,
               costume: cleanedCostume,
@@ -87,7 +71,7 @@ export const Auth = () => {
 
         setForm(initialForm)
         setMode('sign-in')
-        setMessage('Account created. Please check your email and confirm it before signing in.')
+        setMessage('Account created successfully. You can sign in now.')
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: cleanedEmail,
@@ -106,11 +90,6 @@ export const Auth = () => {
 
       if (lowerMessage.includes('rate limit')) {
         setError('Too many signup attempts. Please wait a few minutes and use a valid email address you can access.')
-        return
-      }
-
-      if (lowerMessage.includes('not confirmed') || lowerMessage.includes('email not confirmed')) {
-        setError('Please confirm your email before signing in. Check your inbox for the confirmation link.')
         return
       }
 
