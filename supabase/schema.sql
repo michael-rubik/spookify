@@ -15,6 +15,43 @@ insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', true)
 on conflict (id) do nothing;
 
+create policy "Public avatars are viewable by everyone"
+on storage.objects
+for select
+to public
+using (bucket_id = 'avatars');
+
+create policy "Authenticated users may upload avatars"
+on storage.objects
+for insert
+to authenticated
+with check (
+  bucket_id = 'avatars'
+  and auth.uid() is not null
+);
+
+create policy "Authenticated users may update their own avatars"
+on storage.objects
+for update
+to authenticated
+using (
+  bucket_id = 'avatars'
+  and auth.uid() is not null
+)
+with check (
+  bucket_id = 'avatars'
+  and auth.uid() is not null
+);
+
+create policy "Authenticated users may delete avatars"
+on storage.objects
+for delete
+to authenticated
+using (
+  bucket_id = 'avatars'
+  and auth.uid() is not null
+);
+
 alter table public.users enable row level security;
 
 create or replace function public.handle_new_user()
