@@ -5,6 +5,7 @@ import { supabase } from './utils/supabase/supabase-client'
 import './App.css'
 import { Auth } from './components/auth'
 import { Clicker } from './components/clicker'
+import { Spooks } from './components/spooks'
 import { getUserBadges } from './utils/badges'
 
 type UserProfile = {
@@ -39,7 +40,7 @@ function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
-  const [view, setView] = useState<'clicker' | 'profile' | 'users' | 'admin'>('clicker')
+  const [view, setView] = useState<'clicker' | 'profile' | 'users' | 'spooks' | 'admin'>('clicker')
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>(emptyProfileDraft)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [profileError, setProfileError] = useState('')
@@ -456,6 +457,9 @@ function App() {
             <button type="button" onClick={() => setView('users')}>
               Users
             </button>
+            <button type="button" onClick={() => setView('spooks')}>
+              Spooks
+            </button>
             {isCurrentUserAdmin && (
               <button
                 type="button"
@@ -663,6 +667,8 @@ function App() {
             </ul>
           )}
         </section>
+      ) : view === 'spooks' ? (
+        <Spooks users={users} currentUserId={session.user.id} />
       ) : (
         <section style={{ maxWidth: '760px', margin: '0 auto' }}>
           <h2>Profile</h2>
