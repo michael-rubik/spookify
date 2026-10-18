@@ -330,19 +330,35 @@ function App() {
 
   return (
     <div style={{ minHeight: '100vh', padding: '2rem 1rem', fontFamily: 'sans-serif' }}>
-      <header
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '0.75rem 1.25rem',
-          borderBottom: '1px solid #2a2a2a',
-          marginBottom: '2rem',
-        }}
-      >
-        <h1 style={{ margin: 0 }}>Spookify</h1>
+      {session && (
+        <header
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '0.75rem 1.25rem',
+            borderBottom: '1px solid #2a2a2a',
+            marginBottom: '2rem',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setView('clicker')}
+            style={{
+              margin: 0,
+              background: 'transparent',
+              border: 'none',
+              color: 'inherit',
+              font: 'inherit',
+              fontSize: '2rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            Spookify
+          </button>
 
-        {session && (
           <nav style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button type="button" onClick={() => setView('clicker')}>
               Clicker
@@ -372,8 +388,8 @@ function App() {
               Logout
             </button>
           </nav>
-        )}
-      </header>
+        </header>
+      )}
 
       {!session ? (
         <Auth />
