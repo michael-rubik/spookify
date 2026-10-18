@@ -27,11 +27,11 @@ for update
 to authenticated
 using (
   bucket_id = 'avatars'
-  and auth.uid() is not null
+  and owner = auth.uid()
 )
 with check (
   bucket_id = 'avatars'
-  and auth.uid() is not null
+  and owner = auth.uid()
 );
 
 create policy "Authenticated users may delete avatars"
@@ -40,7 +40,7 @@ for delete
 to authenticated
 using (
   bucket_id = 'avatars'
-  and auth.uid() is not null
+  and owner = auth.uid()
 );
 
 create or replace function public.handle_new_user()
