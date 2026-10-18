@@ -71,6 +71,8 @@ function App() {
     }
 
     const loadUsers = async () => {
+      await ensureCurrentUserProfile(session.user)
+
       setLoadingUsers(true)
 
       const { data, error } = await supabase.from('users').select('*').order('name', { ascending: true })
@@ -88,6 +90,49 @@ function App() {
 
     loadUsers()
   }, [session])
+
+  const ensureCurrentUserProfile = async (user: Session['user']) => {
+    if (!user) {
+      return
+    }
+
+    const nextName = (user.user_metadata?.name as string | undefined)?.trim() || user.email?.split('@')[0] || 'User'
+    const nextCostume = (user.user_metadata?.costume as string | undefined)?.trim() || 'Unknown'
+    const nextEmail = (user.email ?? '').trim()
+
+    if (!nextEmail) {
+      return
+    }
+
+    const { data: existingUser, error: lookupError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (lookupError && lookupError.code !== 'PGRST116') {
+      console.error('Failed to look up current user profile:', lookupError)
+      return
+    }
+
+    if (existingUser) {
+      return
+    }
+
+    const { error: insertError } = await supabase.from('users').insert({
+      id: user.id,
+      name: nextName,
+      costume: nextCostume,
+      email: nextEmail,
+      is_admin: false,
+      click_count: 0,
+      signup_email_status: 'not_sent',
+    })
+
+    if (insertError) {
+      console.error('Failed to create current user profile:', insertError)
+    }
+  }
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut()
