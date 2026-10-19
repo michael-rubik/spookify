@@ -48,10 +48,10 @@ jobs:
         run: supabase init --yes
 
       - name: Link Supabase project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
 
       - name: Preview pending migrations
-        run: supabase db push --dry-run
+        run: supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --dry-run
 
       - name: Apply pending migrations
-        run: supabase db push --yes
+        run: supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --yes

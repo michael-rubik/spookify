@@ -1,4 +1,5 @@
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { isDevLoginEnabled } from '../utils/dev-login'
 import { supabase } from '../utils/supabase/supabase-client'
 import {
   DEFAULT_KARAOKE_DURATION_SECONDS,
@@ -30,6 +31,34 @@ const formatDuration = (seconds: number) => {
   return `${minutes}m ${remainder}s`
 }
 
+const DEV_KARAOKE_QUEUE_KEY = 'spookify-dev-karaoke-queue'
+
+const readDevQueue = (): KaraokeQueueEntry[] => {
+  if (typeof window === 'undefined') {
+    return []
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(DEV_KARAOKE_QUEUE_KEY)
+    if (!storedValue) {
+      return []
+    }
+
+    const parsed = JSON.parse(storedValue) as KaraokeQueueEntry[]
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+const writeDevQueue = (songs: KaraokeQueueEntry[]) => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.localStorage.setItem(DEV_KARAOKE_QUEUE_KEY, JSON.stringify(songs))
+}
+
 export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
   const [queue, setQueue] = useState<KaraokeQueueEntry[]>([])
   const [draft, setDraft] = useState({ title: '', artist: '' })
@@ -40,7 +69,7 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
   const [showPastSongs, setShowPastSongs] = useState(false)
   const [now, setNow] = useState(new Date())
 
-  const syncQueueState = async (rawSongs: KaraokeQueueEntry[]) => {
+  const syncQueueState = useCallback(async (rawSongs: KaraokeQueueEntry[]) => {
     const scheduledSongs = getNormalizedSongSchedule(rawSongs, new Date())
 
     const updates = scheduledSongs.filter((song) => {
@@ -80,11 +109,20 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
     )
 
     return scheduledSongs
-  }
+  }, [])
 
-  const loadQueue = async () => {
+  const loadQueue = useCallback(async () => {
     setIsLoading(true)
     setNow(new Date())
+
+    if (isDevLoginEnabled()) {
+      const devQueue = readDevQueue()
+      const scheduledSongs = getNormalizedSongSchedule(devQueue, new Date())
+      setQueue(scheduledSongs)
+      setIsLoading(false)
+      setError('')
+      return
+    }
 
     const { data, error: queueError } = await supabase
       .from('karaoke_queue')
@@ -103,11 +141,15 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
     setQueue(scheduledSongs)
     setIsLoading(false)
     setError('')
-  }
+  }, [syncQueueState])
 
   useEffect(() => {
-    void loadQueue()
-  }, [])
+    const timer = window.setTimeout(() => {
+      void loadQueue()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [loadQueue])
 
   const handleAddSong = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -123,6 +165,32 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
     setIsSubmitting(true)
     setError('')
     setStatusMessage('')
+
+    if (isDevLoginEnabled()) {
+      const existingSongs = readDevQueue()
+      const nextSong: KaraokeQueueEntry = {
+        id: `dev-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        title: nextTitle,
+        artist: nextArtist || 'Unknown artist',
+        queued_by: currentUserId,
+        created_at: new Date().toISOString(),
+        duration_seconds: DEFAULT_KARAOKE_DURATION_SECONDS,
+        status: 'queued',
+        started_at: null,
+        ends_at: null,
+        skipped_by: null,
+        updated_at: new Date().toISOString(),
+      }
+
+      const nextQueue = [...existingSongs, nextSong]
+      writeDevQueue(nextQueue)
+      setQueue(getNormalizedSongSchedule(nextQueue, new Date()))
+      setDraft({ title: '', artist: '' })
+      setStatusMessage('Song added to the karaoke queue.')
+      setIsSubmitting(false)
+      setError('')
+      return
+    }
 
     const { error: insertError } = await supabase.from('karaoke_queue').insert({
       title: nextTitle,
@@ -153,6 +221,25 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
       return
     }
 
+    if (isDevLoginEnabled()) {
+      const nextQueue: KaraokeQueueEntry[] = readDevQueue().map((song) =>
+        song.id === songId
+          ? {
+              ...song,
+              status: 'skipped',
+              skipped_by: currentUserId,
+              updated_at: new Date().toISOString(),
+            }
+          : song,
+      )
+
+      writeDevQueue(nextQueue)
+      setQueue(getNormalizedSongSchedule(nextQueue, new Date()))
+      setStatusMessage('Song skipped.')
+      setError('')
+      return
+    }
+
     const { error: skipError } = await supabase
       .from('karaoke_queue')
       .update({
@@ -177,6 +264,15 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
       return
     }
 
+    if (isDevLoginEnabled()) {
+      const nextQueue: KaraokeQueueEntry[] = readDevQueue().filter((song) => song.id !== songId)
+      writeDevQueue(nextQueue)
+      setQueue(getNormalizedSongSchedule(nextQueue, new Date()))
+      setStatusMessage('Song removed from the queue.')
+      setError('')
+      return
+    }
+
     const { error: deleteError } = await supabase.from('karaoke_queue').delete().eq('id', songId)
 
     if (deleteError) {
@@ -195,6 +291,24 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
     }
 
     const safeDuration = Math.max(1, Math.round(nextDurationSeconds))
+
+    if (isDevLoginEnabled()) {
+      const nextQueue: KaraokeQueueEntry[] = readDevQueue().map((song) =>
+        song.id === songId
+          ? {
+              ...song,
+              duration_seconds: safeDuration,
+              updated_at: new Date().toISOString(),
+            }
+          : song,
+      )
+
+      writeDevQueue(nextQueue)
+      setQueue(getNormalizedSongSchedule(nextQueue, new Date()))
+      setStatusMessage('Song length updated.')
+      setError('')
+      return
+    }
 
     const { error: updateError } = await supabase
       .from('karaoke_queue')
