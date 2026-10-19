@@ -45,19 +45,26 @@
 .spook-card {
   padding: 0;
   overflow: hidden;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .spook-card-image {
   display: block;
   width: 100%;
-  max-height: 420px;
-  object-fit: cover;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  background: transparent;
+  border-radius: 0;
 }
 
 .spook-card-body {
   padding: 0.9rem;
   display: grid;
   gap: 0.5rem;
+  background: var(--surface);
 }
 
 .spook-card-caption {

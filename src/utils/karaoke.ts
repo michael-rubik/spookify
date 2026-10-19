@@ -24,6 +24,11 @@ export type NormalizedKaraokeQueueEntry = KaraokeQueueEntry & {
   isExpired: boolean
 }
 
+export type KaraokeQueueView = {
+  activeQueue: NormalizedKaraokeQueueEntry[]
+  pastSongs: NormalizedKaraokeQueueEntry[]
+}
+
 export function getNormalizedSongSchedule(
   songs: Partial<KaraokeQueueEntry>[],
   now: Date = new Date(),
@@ -84,4 +89,23 @@ export function getNormalizedSongSchedule(
       isExpired,
     }
   })
+}
+
+export function getKaraokeQueueView(
+  songs: Partial<KaraokeQueueEntry>[],
+  now: Date = new Date(),
+): KaraokeQueueView {
+  const allSongs = getNormalizedSongSchedule(songs, now)
+
+  const activeQueue = allSongs.filter((song) => {
+    const isArchivedStatus = song.normalizedStatus === 'completed' || song.normalizedStatus === 'skipped'
+    return !isArchivedStatus
+  })
+
+  const pastSongs = allSongs.filter((song) => {
+    const isArchivedStatus = song.normalizedStatus === 'completed' || song.normalizedStatus === 'skipped'
+    return isArchivedStatus
+  })
+
+  return { activeQueue, pastSongs }
 }

@@ -7,6 +7,7 @@ import { Clicker } from './components/clicker'
 import { Karaoke } from './components/karaoke'
 import { Spooks } from './components/spooks'
 import { getUserBadges } from './utils/badges'
+import { getDevAdminUser, getDevSession, isDevLoginEnabled } from './utils/dev-login'
 
 type UserProfile = {
   id: string
@@ -37,8 +38,26 @@ const signupStatusOptions = Object.keys(signupStatusLabels)
 const emptyProfileDraft: ProfileDraft = { name: '', costume: '', email: '' }
 
 function App() {
-  const [session, setSession] = useState<Session | null>(null)
-  const [users, setUsers] = useState<UserProfile[]>([])
+  const initialDevUser = getDevAdminUser()
+
+  const [session, setSession] = useState<Session | null>(() => (isDevLoginEnabled() ? getDevSession() : null))
+  const [users, setUsers] = useState<UserProfile[]>(() =>
+    initialDevUser
+      ? [
+          {
+            id: initialDevUser.id,
+            name: initialDevUser.name,
+            costume: initialDevUser.costume,
+            email: initialDevUser.email,
+            avatar_url: initialDevUser.avatar_url,
+            badges: initialDevUser.badges,
+            is_admin: initialDevUser.is_admin,
+            click_count: initialDevUser.click_count,
+            signup_email_status: initialDevUser.signup_email_status,
+          },
+        ]
+      : [],
+  )
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [view, setView] = useState<'clicker' | 'profile' | 'users' | 'spooks' | 'karaoke' | 'admin'>('clicker')
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>(emptyProfileDraft)
@@ -47,6 +66,10 @@ function App() {
   const [profileMessage, setProfileMessage] = useState('')
 
   useEffect(() => {
+    if (isDevLoginEnabled()) {
+      return
+    }
+
     const loadSession = async () => {
       const {
         data: { session: currentSession },
@@ -70,7 +93,7 @@ function App() {
   }, [])
 
   const ensureCurrentUserProfile = async (user: Session['user']) => {
-    if (!user) {
+    if (!user || isDevLoginEnabled()) {
       return
     }
 
@@ -143,6 +166,13 @@ function App() {
   
 
   const handleLogout = async () => {
+    if (isDevLoginEnabled()) {
+      setSession(null)
+      setUsers([])
+      setView('clicker')
+      return
+    }
+
     const { error } = await supabase.auth.signOut()
 
     if (error) {
@@ -485,7 +515,32 @@ function App() {
       )}
 
       {!session ? (
-        <Auth />
+        <Auth
+          onDevLogin={() => {
+            const devUser = getDevAdminUser()
+            const devSession = getDevSession()
+
+            if (!devUser || !devSession) {
+              return
+            }
+
+            setSession(devSession)
+            setUsers([
+              {
+                id: devUser.id,
+                name: devUser.name,
+                costume: devUser.costume,
+                email: devUser.email,
+                avatar_url: devUser.avatar_url,
+                badges: devUser.badges,
+                is_admin: devUser.is_admin,
+                click_count: devUser.click_count,
+                signup_email_status: devUser.signup_email_status,
+              },
+            ])
+            setView('clicker')
+          }}
+        />
       ) : view === 'clicker' ? (
         <Clicker
           userId={session.user.id}

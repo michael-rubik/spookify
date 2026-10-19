@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { supabase } from '../utils/supabase/supabase-client'
 import {
   DEFAULT_KARAOKE_DURATION_SECONDS,
+  getKaraokeQueueView,
   getNormalizedSongSchedule,
   type KaraokeQueueEntry,
 } from '../utils/karaoke'
@@ -36,6 +37,7 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
   const [statusMessage, setStatusMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [showPastSongs, setShowPastSongs] = useState(false)
   const [now, setNow] = useState(new Date())
 
   const syncQueueState = async (rawSongs: KaraokeQueueEntry[]) => {
@@ -82,6 +84,7 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
 
   const loadQueue = async () => {
     setIsLoading(true)
+    setNow(new Date())
 
     const { data, error: queueError } = await supabase
       .from('karaoke_queue')
@@ -104,15 +107,6 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
 
   useEffect(() => {
     void loadQueue()
-
-    const syncTicker = window.setInterval(() => {
-      setNow(new Date())
-      void loadQueue()
-    }, 5000)
-
-    return () => {
-      window.clearInterval(syncTicker)
-    }
   }, [])
 
   const handleAddSong = async (event: FormEvent<HTMLFormElement>) => {
@@ -178,12 +172,59 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
     await loadQueue()
   }
 
-  const scheduledQueue = getNormalizedSongSchedule(queue, now)
+  const handleRemoveSong = async (songId: string) => {
+    if (!isCurrentUserAdmin) {
+      return
+    }
+
+    const { error: deleteError } = await supabase.from('karaoke_queue').delete().eq('id', songId)
+
+    if (deleteError) {
+      console.error('Failed to remove karaoke song:', deleteError)
+      setError('The song could not be removed right now.')
+      return
+    }
+
+    setStatusMessage('Song removed from the queue.')
+    await loadQueue()
+  }
+
+  const handleUpdateDuration = async (songId: string, nextDurationSeconds: number) => {
+    if (!isCurrentUserAdmin) {
+      return
+    }
+
+    const safeDuration = Math.max(1, Math.round(nextDurationSeconds))
+
+    const { error: updateError } = await supabase
+      .from('karaoke_queue')
+      .update({
+        duration_seconds: safeDuration,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', songId)
+
+    if (updateError) {
+      console.error('Failed to update karaoke song duration:', updateError)
+      setError('The song length could not be updated right now.')
+      return
+    }
+
+    setStatusMessage('Song length updated.')
+    await loadQueue()
+  }
+
+  const { activeQueue, pastSongs } = getKaraokeQueueView(queue, now)
 
   return (
     <section style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gap: '1.25rem' }}>
       <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem' }}>
-        <h2 style={{ marginTop: 0 }}>Karaoke Queue</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
+          <h2 style={{ margin: 0 }}>Karaoke Queue</h2>
+          <button type="button" onClick={() => void loadQueue()} disabled={isLoading}>
+            {isLoading ? 'Refreshing...' : 'Refresh queue'}
+          </button>
+        </div>
 
         <form onSubmit={handleAddSong} style={{ display: 'grid', gap: '0.8rem' }}>
           <label htmlFor="karaoke-title" style={{ fontWeight: 600 }}>
@@ -228,11 +269,11 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
 
         {isLoading ? (
           <p>Loading queue...</p>
-        ) : scheduledQueue.length === 0 ? (
+        ) : activeQueue.length === 0 ? (
           <p>No songs queued yet. Add the first performance.</p>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: '0.9rem' }}>
-            {scheduledQueue.map((song, index) => {
+            {activeQueue.map((song, index) => {
               const playTime = new Date(song.shouldPlayAt)
               const endTime = new Date(song.shouldEndAt)
               const startInMs = playTime.getTime() - now.getTime()
@@ -252,16 +293,21 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontSize: '0.8rem', color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        {index === 0 ? 'Now playing' : song.normalizedStatus === 'completed' ? 'Completed' : song.normalizedStatus === 'skipped' ? 'Skipped' : `Up next #${index + 1}`}
+                        {index === 0 ? 'Now playing' : `Up next #${index + 1}`}
                       </div>
                       <strong style={{ fontSize: '1.15rem' }}>{song.title}</strong>
                       <div style={{ color: '#d8d8d8' }}>{song.artist || 'Unknown artist'}</div>
                     </div>
 
-                    {isCurrentUserAdmin && song.normalizedStatus !== 'completed' && song.normalizedStatus !== 'skipped' && (
-                      <button type="button" onClick={() => void handleSkipSong(song.id)}>
-                        Skip
-                      </button>
+                    {isCurrentUserAdmin && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <button type="button" onClick={() => void handleSkipSong(song.id)}>
+                          Skip
+                        </button>
+                        <button type="button" onClick={() => void handleRemoveSong(song.id)}>
+                          Remove
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -271,15 +317,66 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
                     <div>
                       {isCurrentlyPlaying
                         ? `Currently running • ${formatDuration(timeRemainingMs / 1000)} remaining`
-                        : song.normalizedStatus === 'completed' || song.normalizedStatus === 'skipped'
-                          ? 'Queue status: completed'
-                          : `Starts in ${formatDuration(startInMs / 1000)}`}
+                        : `Starts in ${formatDuration(startInMs / 1000)}`}
                     </div>
+                    {isCurrentUserAdmin && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.35rem' }}>
+                        <label htmlFor={`duration-${song.id}`} style={{ fontWeight: 600 }}>
+                          Length
+                        </label>
+                        <input
+                          id={`duration-${song.id}`}
+                          type="number"
+                          min={1}
+                          step={1}
+                          defaultValue={song.duration_seconds}
+                          style={{ width: '5rem', padding: '0.4rem 0.5rem' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const input = document.getElementById(`duration-${song.id}`) as HTMLInputElement | null
+                            if (!input) {
+                              return
+                            }
+
+                            const nextValue = Number(input.value)
+                            if (Number.isFinite(nextValue)) {
+                              void handleUpdateDuration(song.id, nextValue)
+                            }
+                          }}
+                        >
+                          Save length
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </li>
               )
             })}
           </ul>
+        )}
+
+        {pastSongs.length > 0 && (
+          <div style={{ marginTop: '1.25rem', borderTop: '1px solid #2a2a2a', paddingTop: '1rem' }}>
+            <button type="button" onClick={() => setShowPastSongs((current) => !current)}>
+              {showPastSongs ? 'Hide' : 'Show'} past songs ({pastSongs.length})
+            </button>
+
+            {showPastSongs && (
+              <ul style={{ listStyle: 'none', padding: '0.75rem 0 0', margin: 0, display: 'grid', gap: '0.7rem' }}>
+                {pastSongs.map((song) => (
+                  <li key={song.id} style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '0.7rem 0.9rem' }}>
+                    <strong>{song.title}</strong>
+                    <div style={{ color: '#d8d8d8' }}>{song.artist || 'Unknown artist'}</div>
+                    <div style={{ color: '#a3a3a3', fontSize: '0.78rem' }}>
+                      {song.normalizedStatus === 'completed' ? 'Completed' : 'Skipped'}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </div>
     </section>

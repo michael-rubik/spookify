@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { supabase } from '../utils/supabase/supabase-client'
+import { isDevLoginEnabled } from '../utils/dev-login'
 
 type AuthMode = 'sign-in' | 'sign-up'
 
@@ -22,12 +23,25 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const isValidEmail = (value: string) => EMAIL_REGEX.test(value.trim())
 
-export const Auth = () => {
+type AuthProps = {
+  onDevLogin?: () => void
+}
+
+export const Auth = ({ onDevLogin }: AuthProps) => {
   const [mode, setMode] = useState<AuthMode>('sign-in')
   const [form, setForm] = useState<FormState>(initialForm)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleDevLogin = () => {
+    if (!isDevLoginEnabled()) {
+      return
+    }
+
+    setMessage('Developer login successful.')
+    onDevLogin?.()
+  }
 
   const updateField =
     (field: keyof FormState) => (event: ChangeEvent<HTMLInputElement>) => {
@@ -39,6 +53,11 @@ export const Auth = () => {
     event.preventDefault()
     setError('')
     setMessage('')
+
+    if (isDevLoginEnabled()) {
+      handleDevLogin()
+      return
+    }
 
     const cleanedEmail = form.email.trim()
 
@@ -101,7 +120,15 @@ export const Auth = () => {
 
   return (
     <div className="auth-wrap">
-      <h1>{mode === 'sign-up' ? 'Create account' : 'Login'}</h1>
+      <h1>{mode === 'sign-up' ? 'Sign Up' : 'Sign In'}</h1>
+
+      {isDevLoginEnabled() && (
+        <div style={{ marginBottom: '1rem' }}>
+          <button type="button" onClick={handleDevLogin}>
+            Developer login
+          </button>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="auth-form">
         <div className="auth-hint">
@@ -158,7 +185,7 @@ export const Auth = () => {
         )}
 
         <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Please wait...' : mode === 'sign-up' ? 'Create account' : 'Login'}
+          {isSubmitting ? 'Please wait...' : mode === 'sign-up' ? 'Sign Up' : 'Sign In'}
         </button>
       </form>
 

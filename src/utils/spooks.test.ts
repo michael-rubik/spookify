@@ -1,5 +1,8 @@
+import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { normalizeSpookRow, sortSpooksByNewest } from './spooks'
+
+const spookStyles = fs.readFileSync(new URL('../components/spooks.css', import.meta.url), 'utf8')
 
 describe('sortSpooksByNewest', () => {
   it('orders spooks from newest to oldest', () => {
@@ -47,5 +50,12 @@ describe('normalizeSpookRow', () => {
     })
 
     expect(normalized.tagged_user_ids).toEqual(['user-a'])
+  })
+})
+
+describe('spook image sizing', () => {
+  it('keeps the entire image visible without cropping to the container', () => {
+    expect(spookStyles).toContain('object-fit: contain')
+    expect(spookStyles).not.toContain('object-fit: cover')
   })
 })
