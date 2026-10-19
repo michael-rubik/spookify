@@ -37,8 +37,20 @@ export function getNormalizedSongSchedule(
     (left, right) => new Date(left.created_at ?? 0).getTime() - new Date(right.created_at ?? 0).getTime(),
   )
 
+  const activeSong = orderedSongs.find((song) => {
+    const rawStatus = (song.status ?? 'queued') as KaraokeSongStatus
+    if (rawStatus === 'completed' || rawStatus === 'skipped') {
+      return false
+    }
+
+    const startedAt = song.started_at ? new Date(song.started_at) : null
+    const endsAt = song.ends_at ? new Date(song.ends_at) : null
+
+    return rawStatus === 'playing' || !!(startedAt && endsAt && startedAt.getTime() <= now.getTime() && endsAt.getTime() > now.getTime())
+  })
+
   const firstSongStart = orderedSongs[0]?.created_at ? new Date(orderedSongs[0].created_at) : new Date(now)
-  let scheduleCursor = new Date(firstSongStart)
+  let scheduleCursor = activeSong?.ends_at ? new Date(activeSong.ends_at) : new Date(firstSongStart)
   let hasActiveSong = false
 
   return orderedSongs.map((song) => {
@@ -47,7 +59,9 @@ export function getNormalizedSongSchedule(
       Number(song.duration_seconds ?? DEFAULT_KARAOKE_DURATION_SECONDS),
     )
 
-    const shouldPlayAt = new Date(scheduleCursor)
+    const shouldPlayAt = activeSong && song.id === activeSong.id && activeSong.started_at
+      ? new Date(activeSong.started_at)
+      : new Date(scheduleCursor)
     const shouldEndAt = new Date(shouldPlayAt.getTime() + durationSeconds * 1000)
     const rawStatus = (song.status ?? 'queued') as KaraokeSongStatus
     const isExpired =
@@ -65,7 +79,8 @@ export function getNormalizedSongSchedule(
       rawStatus !== 'completed' &&
       rawStatus !== 'skipped' &&
       !isExpired &&
-      !hasActiveSong
+      !hasActiveSong &&
+      (!activeSong || song.id === activeSong.id)
 
     if (isCurrentSong) {
       hasActiveSong = true

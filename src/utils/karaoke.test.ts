@@ -104,6 +104,66 @@ describe('getNormalizedSongSchedule', () => {
     expect(scheduled[0].shouldEndAt).toBe('2026-01-01T12:04:00.000Z')
   })
 
+  it('starts newly queued songs at the current time and after the active song ends', () => {
+    const now = new Date('2026-01-01T12:00:05.000Z')
+
+    const queueAtCurrentTime = getNormalizedSongSchedule(
+      [
+        {
+          id: 'song-new',
+          title: 'New song',
+          artist: 'Tester',
+          queued_by: 'user-2',
+          created_at: '2026-01-01T12:00:05.000Z',
+          duration_seconds: 300,
+          status: 'queued',
+          started_at: null,
+          ends_at: null,
+          skipped_by: null,
+        },
+      ],
+      now,
+    )
+
+    expect(queueAtCurrentTime[0].normalizedStatus).toBe('playing')
+    expect(queueAtCurrentTime[0].shouldPlayAt).toBe('2026-01-01T12:00:05.000Z')
+
+    const queueAfterCurrentSong = getNormalizedSongSchedule(
+      [
+        {
+          id: 'song-current',
+          title: 'Current song',
+          artist: 'Tester',
+          queued_by: 'user-1',
+          created_at: '2026-01-01T11:57:00.000Z',
+          duration_seconds: 300,
+          status: 'playing',
+          started_at: '2026-01-01T11:59:00.000Z',
+          ends_at: '2026-01-01T12:04:00.000Z',
+          skipped_by: null,
+        },
+        {
+          id: 'song-new',
+          title: 'New song',
+          artist: 'Tester',
+          queued_by: 'user-2',
+          created_at: '2026-01-01T12:00:05.000Z',
+          duration_seconds: 300,
+          status: 'queued',
+          started_at: null,
+          ends_at: null,
+          skipped_by: null,
+        },
+      ],
+      now,
+    )
+
+    expect(queueAfterCurrentSong[0].normalizedStatus).toBe('playing')
+    expect(queueAfterCurrentSong[0].shouldPlayAt).toBe('2026-01-01T11:59:00.000Z')
+    expect(queueAfterCurrentSong[1].normalizedStatus).toBe('queued')
+    expect(queueAfterCurrentSong[1].shouldPlayAt).toBe('2026-01-01T12:04:00.000Z')
+  })
+
   it('hides completed and skipped songs from the live queue while keeping them in the past-song archive', () => {
     const now = new Date('2026-01-01T12:10:00.000Z')
 
