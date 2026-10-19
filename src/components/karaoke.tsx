@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useRef, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { supabase } from '../utils/supabase/supabase-client'
 import {
   DEFAULT_KARAOKE_DURATION_SECONDS,
@@ -37,7 +37,6 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [now, setNow] = useState(new Date())
-  const loadQueueRef = useRef<() => Promise<void>>(async () => {})
 
   const syncQueueState = async (rawSongs: KaraokeQueueEntry[]) => {
     const scheduledSongs = getNormalizedSongSchedule(rawSongs, new Date())
@@ -81,29 +80,29 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
     return scheduledSongs
   }
 
-  useEffect(() => {
-    const loadQueue = async () => {
-      const { data, error: queueError } = await supabase
-        .from('karaoke_queue')
-        .select('*')
-        .order('created_at', { ascending: true })
+  const loadQueue = async () => {
+    setIsLoading(true)
 
-      if (queueError) {
-        console.error('Failed to load karaoke queue:', queueError)
-        setError('Could not load the karaoke queue right now.')
-        setQueue([])
-        setIsLoading(false)
-        return
-      }
+    const { data, error: queueError } = await supabase
+      .from('karaoke_queue')
+      .select('*')
+      .order('created_at', { ascending: true })
 
-      const scheduledSongs = await syncQueueState((data ?? []) as KaraokeQueueEntry[])
-      setQueue(scheduledSongs)
+    if (queueError) {
+      console.error('Failed to load karaoke queue:', queueError)
+      setError('Could not load the karaoke queue right now.')
+      setQueue([])
       setIsLoading(false)
-      setError('')
+      return
     }
 
-    loadQueueRef.current = loadQueue
+    const scheduledSongs = await syncQueueState((data ?? []) as KaraokeQueueEntry[])
+    setQueue(scheduledSongs)
+    setIsLoading(false)
+    setError('')
+  }
 
+  useEffect(() => {
     void loadQueue()
 
     const syncTicker = window.setInterval(() => {
@@ -152,7 +151,7 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
 
     setDraft({ title: '', artist: '' })
     setStatusMessage('Song added to the karaoke queue.')
-    await loadQueueRef.current()
+    await loadQueue()
   }
 
   const handleSkipSong = async (songId: string) => {
@@ -176,18 +175,18 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
     }
 
     setStatusMessage('Song skipped.')
-    await loadQueueRef.current()
+    await loadQueue()
   }
 
   const scheduledQueue = getNormalizedSongSchedule(queue, now)
 
   return (
-    <section className="page-section">
-      <div className="card">
-        <h2>Karaoke Queue</h2>
+    <section style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gap: '1.25rem' }}>
+      <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem' }}>
+        <h2 style={{ marginTop: 0 }}>Karaoke Queue</h2>
 
-        <form onSubmit={handleAddSong} className="stack">
-          <label htmlFor="karaoke-title">
+        <form onSubmit={handleAddSong} style={{ display: 'grid', gap: '0.8rem' }}>
+          <label htmlFor="karaoke-title" style={{ fontWeight: 600 }}>
             Song title
           </label>
           <input
@@ -196,9 +195,10 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
             value={draft.title}
             onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
             placeholder="Enter a song title"
+            style={{ padding: '0.6rem 0.75rem' }}
           />
 
-          <label htmlFor="karaoke-artist">
+          <label htmlFor="karaoke-artist" style={{ fontWeight: 600 }}>
             Artist
           </label>
           <input
@@ -207,14 +207,15 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
             value={draft.artist}
             onChange={(event) => setDraft((current) => ({ ...current, artist: event.target.value }))}
             placeholder="Optional artist"
+            style={{ padding: '0.6rem 0.75rem' }}
           />
 
-          <div className="muted" style={{ fontSize: '0.9rem' }}>
+          <div style={{ color: '#bdbdbd', fontSize: '0.9rem' }}>
             Default queue duration: {formatDuration(DEFAULT_KARAOKE_DURATION_SECONDS)}
           </div>
 
-          {error && <p role="alert" className="form-error">{error}</p>}
-          {statusMessage && <p role="status" className="form-success">{statusMessage}</p>}
+          {error && <p role="alert" style={{ margin: 0, color: '#ffb4b4' }}>{error}</p>}
+          {statusMessage && <p role="status" style={{ margin: 0, color: '#b7f7c7' }}>{statusMessage}</p>}
 
           <button type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Queuing...' : 'Add to karaoke queue'}
@@ -222,15 +223,15 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
         </form>
       </div>
 
-      <div className="card">
-        <h3>Scheduled songs</h3>
+      <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem' }}>
+        <h3 style={{ marginTop: 0 }}>Scheduled songs</h3>
 
         {isLoading ? (
           <p>Loading queue...</p>
         ) : scheduledQueue.length === 0 ? (
           <p>No songs queued yet. Add the first performance.</p>
         ) : (
-          <ul className="list" style={{ gap: '0.9rem' }}>
+          <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: '0.9rem' }}>
             {scheduledQueue.map((song, index) => {
               const playTime = new Date(song.shouldPlayAt)
               const endTime = new Date(song.shouldEndAt)
@@ -241,15 +242,20 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
               return (
                 <li
                   key={song.id}
-                  className={`card karaoke-entry${isCurrentlyPlaying ? ' karaoke-entry--playing' : ''}`}
+                  style={{
+                    border: '1px solid #2a2a2a',
+                    borderRadius: '12px',
+                    padding: '0.9rem',
+                    background: isCurrentlyPlaying ? '#1d2e22' : '#171717',
+                  }}
                 >
-                  <div className="row row--between">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center' }}>
                     <div>
-                      <div className="karaoke-entry-status">
+                      <div style={{ fontSize: '0.8rem', color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         {index === 0 ? 'Now playing' : song.normalizedStatus === 'completed' ? 'Completed' : song.normalizedStatus === 'skipped' ? 'Skipped' : `Up next #${index + 1}`}
                       </div>
-                      <strong className="karaoke-entry-title">{song.title}</strong>
-                      <div>{song.artist || 'Unknown artist'}</div>
+                      <strong style={{ fontSize: '1.15rem' }}>{song.title}</strong>
+                      <div style={{ color: '#d8d8d8' }}>{song.artist || 'Unknown artist'}</div>
                     </div>
 
                     {isCurrentUserAdmin && song.normalizedStatus !== 'completed' && song.normalizedStatus !== 'skipped' && (
@@ -259,7 +265,7 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
                     )}
                   </div>
 
-                  <div className="karaoke-entry-meta">
+                  <div style={{ marginTop: '0.8rem', display: 'grid', gap: '0.35rem', color: '#d9d9d9' }}>
                     <div>Should play at: {formatTime(playTime)}</div>
                     <div>Ends at: {formatTime(endTime)}</div>
                     <div>

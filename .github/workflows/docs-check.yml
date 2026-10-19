@@ -1,0 +1,23 @@
+name: Docs checks
+
+on: [push, pull_request]
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install
+        run: npm ci
+      - name: Run migration check
+        run: node scripts/check-migrations.js
+      - name: Markdown link check
+        run: |
+          npm install -g markdown-link-check
+          markdown-link-check 'docs/**/*.md' || true
+      - name: Markdown lint
+        run: npx markdownlint-cli2 'docs/**/*.md'
