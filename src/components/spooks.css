@@ -1,0 +1,98 @@
+.spooks-section {
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  gap: 1.25rem;
+  text-align: left;
+}
+
+.spooks-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.spooks-form-header h2 {
+  margin: 0;
+}
+
+.spooks-form {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+/* Mobile-first: creation form collapses behind the toggle button. */
+.spooks-form.is-hidden {
+  display: none;
+}
+
+.spooks-form-toggle {
+  display: inline-block;
+}
+
+.spooks-selected-file {
+  font-size: 0.9rem;
+}
+
+.spooks-feed {
+  display: grid;
+  gap: 1rem;
+}
+
+.spook-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.spook-card-image {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+}
+
+.spook-card-body {
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.spook-card-caption {
+  line-height: 1.6;
+  margin: 0;
+}
+
+.spook-card-author {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spook-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.spook-card-tags-label {
+  color: var(--surface-muted);
+}
+
+.spook-card-time {
+  font-size: 0.8rem;
+}
+
+@media (min-width: 768px) {
+  .spooks-form-toggle {
+    display: none;
+  }
+
+  .spooks-form.is-hidden {
+    display: grid;
+  }
+}

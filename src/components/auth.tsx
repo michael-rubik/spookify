@@ -100,20 +100,11 @@ export const Auth = () => {
   }
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '60vh',
-        gap: '1rem',
-      }}
-    >
+    <div className="auth-wrap">
       <h1>{mode === 'sign-up' ? 'Create account' : 'Login'}</h1>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: 'min(420px, 90vw)' }}>
-        <div style={{ textAlign: 'left', fontSize: '0.85rem', color: '#666', marginTop: '-0.2rem' }}>
+      <form onSubmit={handleSubmit} className="auth-form">
+        <div className="auth-hint">
           {mode === 'sign-up'
             ? 'Use a real email address you can access. Supabase blocks repeated signup attempts.'
             : 'Use the email and password for your existing account.'}
@@ -157,11 +148,11 @@ export const Auth = () => {
           required
         />
 
-        {error && <p role="alert" style={{ color: '#ffb4b4', margin: 0 }}>{error}</p>}
-        {message && <p role="status" style={{ color: '#b7f7c7', margin: 0 }}>{message}</p>}
+        {error && <p role="alert" className="form-error">{error}</p>}
+        {message && <p role="status" className="form-success">{message}</p>}
 
         {mode === 'sign-up' && (
-          <div style={{ fontSize: '0.8rem', color: '#666', textAlign: 'left' }}>
+          <div className="auth-hint" style={{ fontSize: '0.8rem' }}>
             Tip: a valid email is required for account creation, and repeated attempts may be temporarily blocked.
           </div>
         )}

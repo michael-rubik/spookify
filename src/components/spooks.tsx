@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { supabase } from '../utils/supabase/supabase-client'
-import { sortSpooksByNewest, type SpookRecord } from '../utils/spooks'
+import { normalizeSpookRow, sortSpooksByNewest, type SpookRecord } from '../utils/spooks'
+import './spooks.css'
 
 type UserSummary = {
   id: string
@@ -14,38 +15,40 @@ type SpooksProps = {
   users: UserSummary[]
 }
 
+type SpookRow = Omit<SpookRecord, 'tagged_user_ids'> & {
+  spook_tagged_users: { user_id: string }[] | null
+}
+
 export function Spooks({ currentUserId, users }: SpooksProps) {
   const [feed, setFeed] = useState<SpookRecord[]>([])
   const [caption, setCaption] = useState('')
-  const [taggedUserId, setTaggedUserId] = useState('')
+  const [taggedUserIds, setTaggedUserIds] = useState<string[]>([])
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
-
-  const loadFeed = async () => {
-    setIsLoading(true)
-    setError('')
-
-    const { data, error: feedError } = await supabase
-      .from('spooks')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (feedError) {
-      console.error('Failed to load spooks:', feedError)
-      setError('Could not load the spook feed right now.')
-      setFeed([])
-      setIsLoading(false)
-      return
-    }
-
-    setFeed(sortSpooksByNewest((data ?? []) as SpookRecord[]))
-    setIsLoading(false)
-  }
+  const [isFormOpen, setIsFormOpen] = useState(false)
 
   useEffect(() => {
+    const loadFeed = async () => {
+      const { data, error: feedError } = await supabase
+        .from('spooks')
+        .select('*, spook_tagged_users(user_id)')
+        .order('created_at', { ascending: false })
+
+      if (feedError) {
+        console.error('Failed to load spooks:', feedError)
+        setError('Could not load the spook feed right now.')
+        setFeed([])
+        setIsLoading(false)
+        return
+      }
+
+      setFeed(sortSpooksByNewest((data ?? []).map((row) => normalizeSpookRow(row as SpookRow))))
+      setIsLoading(false)
+    }
+
     void loadFeed()
   }, [])
 
@@ -54,6 +57,25 @@ export function Spooks({ currentUserId, users }: SpooksProps) {
     setSelectedFile(file)
     if (error) {
       setError('')
+    }
+  }
+
+  const toggleTaggedUser = (userId: string) => {
+    setTaggedUserIds((current) =>
+      current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId],
+    )
+    if (error) {
+      setError('')
+    }
+  }
+
+  const resetForm = () => {
+    setCaption('')
+    setTaggedUserIds([])
+    setSelectedFile(null)
+    const fileInput = document.getElementById('spook-image') as HTMLInputElement | null
+    if (fileInput) {
+      fileInput.value = ''
     }
   }
 
@@ -102,25 +124,39 @@ export function Spooks({ currentUserId, users }: SpooksProps) {
           user_id: currentUserId,
           caption: trimmedCaption,
           image_url: publicUrlData.publicUrl,
-          tagged_user_id: taggedUserId || null,
         })
-        .select()
+        .select('id, user_id, caption, image_url, created_at')
         .single()
 
       if (insertError) {
         throw insertError
       }
 
-      const nextSpook = insertedSpook as SpookRecord
-      setFeed((currentFeed) => sortSpooksByNewest([nextSpook, ...currentFeed]))
-      setCaption('')
-      setTaggedUserId('')
-      setSelectedFile(null)
-      setStatusMessage('Spook posted successfully.')
-      const fileInput = document.getElementById('spook-image') as HTMLInputElement | null
-      if (fileInput) {
-        fileInput.value = ''
+      const spookId = (insertedSpook as { id: string }).id
+
+      if (taggedUserIds.length > 0) {
+        const { error: tagError } = await supabase
+          .from('spook_tagged_users')
+          .insert(taggedUserIds.map((userId) => ({ spook_id: spookId, user_id: userId })))
+
+        if (tagError) {
+          const { error: cleanupError } = await supabase.from('spooks').delete().eq('id', spookId)
+          if (cleanupError) {
+            console.error('Failed to roll back spook after tag insert failed:', cleanupError)
+          }
+          throw tagError
+        }
       }
+
+      const nextSpook: SpookRecord = {
+        ...(insertedSpook as Omit<SpookRecord, 'tagged_user_ids'>),
+        tagged_user_ids: [...taggedUserIds],
+      }
+
+      setFeed((currentFeed) => sortSpooksByNewest([nextSpook, ...currentFeed]))
+      resetForm()
+      setIsFormOpen(false)
+      setStatusMessage('Spook posted successfully.')
     } catch (submitError) {
       console.error('Failed to create spook:', submitError)
       setError('Your spook could not be posted. Please try again.')
@@ -130,14 +166,21 @@ export function Spooks({ currentUserId, users }: SpooksProps) {
   }
 
   return (
-    <section style={{ maxWidth: '760px', margin: '0 auto', display: 'grid', gap: '1.25rem' }}>
-      <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem', display: 'grid', gap: '1rem' }}>
-        <h2 style={{ margin: 0 }}>Spooks</h2>
+    <section className="spooks-section">
+      <div className="card">
+        <div className="spooks-form-header">
+          <h2>Spooks</h2>
+          <button
+            type="button"
+            className="spooks-form-toggle"
+            onClick={() => setIsFormOpen((open) => !open)}
+          >
+            {isFormOpen ? 'Close' : '👻 New spook'}
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '0.8rem' }}>
-          <label htmlFor="spook-caption" style={{ fontWeight: 600 }}>
-            Caption
-          </label>
+        <form onSubmit={handleSubmit} className={`spooks-form${isFormOpen ? '' : ' is-hidden'}`}>
+          <label htmlFor="spook-caption">Caption</label>
           <textarea
             id="spook-caption"
             value={caption}
@@ -148,41 +191,48 @@ export function Spooks({ currentUserId, users }: SpooksProps) {
             }}
             placeholder="Tell the spooky story..."
             rows={4}
-            style={{ padding: '0.75rem', resize: 'vertical' }}
           />
 
-          <label htmlFor="spook-tagged-user" style={{ fontWeight: 600 }}>
-            Tag another user
-          </label>
-          <select
-            id="spook-tagged-user"
-            value={taggedUserId}
-            onChange={(event) => setTaggedUserId(event.target.value)}
-            style={{ padding: '0.6rem 0.75rem' }}
-          >
-            <option value="">No tag</option>
-            {users
-              .filter((user) => user.id !== currentUserId)
-              .map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              ))}
-          </select>
+          <span className="field-label">Tag users</span>
+          <div className="tag-picker" role="group" aria-label="Tag users">
+            {users.map((user) => {
+              const isSelected = taggedUserIds.includes(user.id)
+              return (
+                <button
+                  key={user.id}
+                  type="button"
+                  className={`tag-chip${isSelected ? ' is-selected' : ''}`}
+                  aria-pressed={isSelected}
+                  onClick={() => toggleTaggedUser(user.id)}
+                >
+                  {user.avatar_url ? (
+                    <img src={user.avatar_url} alt="" className="avatar avatar--sm" />
+                  ) : (
+                    <span className="avatar avatar--sm avatar--fallback">
+                      {user.name.slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                  <span>{user.name}</span>
+                </button>
+              )
+            })}
+          </div>
 
-          <label htmlFor="spook-image" style={{ fontWeight: 600 }}>
-            Upload image
-          </label>
+          <label htmlFor="spook-image">Upload image</label>
           <input id="spook-image" type="file" accept="image/*" onChange={handleFileChange} />
 
-          {selectedFile && (
-            <div style={{ color: '#ddd', fontSize: '0.9rem' }}>
-              Selected: {selectedFile.name}
-            </div>
-          )}
+          {selectedFile && <div className="muted spooks-selected-file">Selected: {selectedFile.name}</div>}
 
-          {error && <p role="alert" style={{ margin: 0, color: '#ffb4b4' }}>{error}</p>}
-          {statusMessage && <p role="status" style={{ margin: 0, color: '#b7f7c7' }}>{statusMessage}</p>}
+          {error && (
+            <p role="alert" className="form-error">
+              {error}
+            </p>
+          )}
+          {statusMessage && (
+            <p role="status" className="form-success">
+              {statusMessage}
+            </p>
+          )}
 
           <button type="submit" disabled={isUploading}>
             {isUploading ? 'Posting...' : 'Post spook'}
@@ -190,72 +240,72 @@ export function Spooks({ currentUserId, users }: SpooksProps) {
         </form>
       </div>
 
-      <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem' }}>
-        <h3 style={{ marginTop: 0 }}>Public feed</h3>
+      <div className="card">
+        <h3>Public feed</h3>
 
         {isLoading ? (
           <p>Loading spooks...</p>
         ) : feed.length === 0 ? (
           <p>No spooks yet. Be the first to post one.</p>
         ) : (
-          <div style={{ display: 'grid', gap: '1rem' }}>
+          <div className="spooks-feed">
             {feed.map((spook) => {
               const author = users.find((user) => user.id === spook.user_id)
-              const taggedUser = users.find((user) => user.id === spook.tagged_user_id)
+              const taggedUsers = spook.tagged_user_ids
+                .map((userId) => users.find((user) => user.id === userId))
+                .filter((user): user is UserSummary => Boolean(user))
+              const hasGhost = taggedUsers.length === 0
 
               return (
-                <article
-                  key={spook.id}
-                  style={{
-                    border: '1px solid #2a2a2a',
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                    background: '#171717',
-                  }}
-                >
+                <article key={spook.id} className="card spook-card">
                   <img
+                    className="spook-card-image"
                     src={spook.image_url}
                     alt={spook.caption || 'Spook image'}
-                    style={{ display: 'block', width: '100%', maxHeight: '420px', objectFit: 'cover' }}
                   />
 
-                  <div style={{ padding: '0.9rem', display: 'grid', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div className="spook-card-body">
+                    <p className="spook-card-caption">{spook.caption}</p>
+
+                    <div className="spook-card-author">
                       {author?.avatar_url ? (
                         <img
                           src={author.avatar_url}
                           alt={`${author.name} avatar`}
-                          style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
+                          className="avatar avatar--md"
                         />
                       ) : (
-                        <div
-                          style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '50%',
-                            background: '#3d3d3d',
-                            display: 'grid',
-                            placeItems: 'center',
-                            color: '#fff',
-                            fontSize: '0.7rem',
-                          }}
-                        >
+                        <span className="avatar avatar--md avatar--fallback">
                           {author?.name?.slice(0, 1).toUpperCase() ?? 'U'}
-                        </div>
+                        </span>
                       )}
-
                       <strong>{author?.name ?? 'Unknown spookster'}</strong>
                     </div>
 
-                    <p style={{ margin: 0, lineHeight: 1.6 }}>{spook.caption}</p>
+                    <div className="spook-card-tags">
+                      <span className="spook-card-tags-label">Tagged:</span>
+                      {hasGhost ? (
+                        <span className="tag-chip tag-chip--ghost" title="No one was tagged...">
+                          <span className="avatar avatar--sm avatar--ghost">👻</span>
+                          <em>spooky ghost</em>
+                        </span>
+                      ) : (
+                        taggedUsers.map((user) => (
+                          <span key={user.id} className="tag-chip">
+                            {user.avatar_url ? (
+                              <img src={user.avatar_url} alt="" className="avatar avatar--sm" />
+                            ) : (
+                              <span className="avatar avatar--sm avatar--fallback">
+                                {user.name.slice(0, 1).toUpperCase()}
+                              </span>
+                            )}
+                            <span>{user.name}</span>
+                          </span>
+                        ))
+                      )}
+                    </div>
 
-                    {taggedUser && (
-                      <div style={{ color: '#d7d7d7', fontSize: '0.9rem' }}>
-                        Tagged: <strong>{taggedUser.name}</strong>
-                      </div>
-                    )}
-
-                    <div style={{ color: '#a6a6a6', fontSize: '0.8rem' }}>
+                    <div className="spook-card-time muted">
                       {new Date(spook.created_at).toLocaleString()}
                     </div>
                   </div>

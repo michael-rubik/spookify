@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import type { FormEvent, ChangeEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './utils/supabase/supabase-client'
-import './App.css'
 import { Auth } from './components/auth'
 import { Clicker } from './components/clicker'
 import { Karaoke } from './components/karaoke'
@@ -417,69 +416,68 @@ function App() {
       .eq('id', userId)
   }
 
+  const navItems: { key: typeof view; label: string; icon: string }[] = [
+    { key: 'clicker', label: 'Clicker', icon: '👻' },
+    { key: 'spooks', label: 'Spooks', icon: '🎃' },
+    { key: 'karaoke', label: 'Karaoke', icon: '🎤' },
+    { key: 'users', label: 'Users', icon: '🧟' },
+    { key: 'profile', label: 'Profile', icon: '🎭' },
+  ]
+
   return (
-    <div style={{ minHeight: '100vh', padding: '2rem 1rem', fontFamily: 'sans-serif' }}>
+    <div className="app-shell">
       {session && (
-        <header
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '0.75rem 1.25rem',
-            borderBottom: '1px solid #2a2a2a',
-            marginBottom: '2rem',
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setView('clicker')}
-            style={{
-              margin: 0,
-              background: 'transparent',
-              border: 'none',
-              color: 'inherit',
-              font: 'inherit',
-              fontSize: '2rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              padding: 0,
-            }}
-          >
+        <header className="app-header">
+          <button type="button" className="app-brand" onClick={() => setView('clicker')}>
             Spookify
           </button>
 
-          <nav style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <button type="button" onClick={() => setView('clicker')}>
+          <nav className="header-nav">
+            <button
+              type="button"
+              className={`nav-button${view === 'clicker' ? ' is-active' : ''}`}
+              onClick={() => setView('clicker')}
+            >
               Clicker
             </button>
-            <button type="button" onClick={() => setView('profile')}>
+            <button
+              type="button"
+              className={`nav-button${view === 'profile' ? ' is-active' : ''}`}
+              onClick={() => setView('profile')}
+            >
               Profile
             </button>
-            <button type="button" onClick={() => setView('users')}>
+            <button
+              type="button"
+              className={`nav-button${view === 'users' ? ' is-active' : ''}`}
+              onClick={() => setView('users')}
+            >
               Users
             </button>
-            <button type="button" onClick={() => setView('spooks')}>
+            <button
+              type="button"
+              className={`nav-button${view === 'spooks' ? ' is-active' : ''}`}
+              onClick={() => setView('spooks')}
+            >
               Spooks
             </button>
-            <button type="button" onClick={() => setView('karaoke')}>
+            <button
+              type="button"
+              className={`nav-button${view === 'karaoke' ? ' is-active' : ''}`}
+              onClick={() => setView('karaoke')}
+            >
               Karaoke
             </button>
             {isCurrentUserAdmin && (
               <button
                 type="button"
+                className={`nav-button nav-button--admin${view === 'admin' ? ' is-active' : ''}`}
                 onClick={() => setView('admin')}
-                style={{
-                  background: '#b42318',
-                  color: '#fff',
-                  border: '1px solid #b42318',
-                  borderRadius: '8px',
-                  padding: '0.5rem 0.8rem',
-                }}
               >
                 Admin
               </button>
             )}
-            <button type="button" onClick={handleLogout}>
+            <button type="button" className="nav-button" onClick={handleLogout}>
               Logout
             </button>
           </nav>
@@ -495,48 +493,41 @@ function App() {
           onCountChange={(nextCount) => updateUserCount(session.user.id, nextCount)}
         />
       ) : view === 'admin' ? (
-        <section style={{ maxWidth: '900px', margin: '0 auto' }}>
+        <section className="page-section">
           <h2>Admin Panel</h2>
 
           {!isCurrentUserAdmin ? (
             <p>You do not have admin access.</p>
           ) : (
             <>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                  gap: '1rem',
-                  marginBottom: '1.5rem',
-                }}
-              >
-                <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem' }}>
-                  <div style={{ color: '#aaa', fontSize: '0.8rem' }}>Pending logins</div>
-                  <strong style={{ fontSize: '2rem' }}>{pendingLogins}</strong>
+              <div className="stat-grid">
+                <div className="card">
+                  <div className="stat-label">Pending logins</div>
+                  <strong className="stat-value">{pendingLogins}</strong>
                 </div>
-                <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem' }}>
-                  <div style={{ color: '#aaa', fontSize: '0.8rem' }}>Email verification links sent</div>
-                  <strong style={{ fontSize: '2rem' }}>{verificationLinksSent}</strong>
+                <div className="card">
+                  <div className="stat-label">Email verification links sent</div>
+                  <strong className="stat-value">{verificationLinksSent}</strong>
                 </div>
               </div>
 
-              <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+              <div className="card">
+                <div className="row row--between">
                   <h3 style={{ margin: 0 }}>Badge refresh</h3>
                   <button type="button" onClick={handleRefreshBadges}>Refresh all badges</button>
                 </div>
               </div>
 
-              <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem' }}>
+              <div className="card">
                 <h3 style={{ marginTop: 0 }}>Signup tracking</h3>
-                <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: '0.75rem' }}>
+                <ul className="list">
                   {users.map((user) => (
-                    <li key={user.id} style={{ borderBottom: '1px solid #2a2a2a', paddingBottom: '0.5rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center' }}>
+                    <li key={user.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+                      <div className="row row--between">
                         <strong>{user.name}</strong>
-                        <span style={{ fontSize: '0.8rem', color: '#ddd' }}>{signupStatusLabels[user.signup_email_status ?? 'not_sent']}</span>
+                        <span className="muted" style={{ fontSize: '0.8rem' }}>{signupStatusLabels[user.signup_email_status ?? 'not_sent']}</span>
                       </div>
-                      <div style={{ color: '#bbb' }}>{user.email}</div>
+                      <div className="muted">{user.email}</div>
                     </li>
                   ))}
                 </ul>
@@ -545,7 +536,7 @@ function App() {
           )}
         </section>
       ) : view === 'users' ? (
-        <section style={{ maxWidth: '760px', margin: '0 auto' }}>
+        <section className="page-section">
           <h2>Users</h2>
 
           {!hasAnyAdminUsers && currentUser && (
@@ -564,7 +555,7 @@ function App() {
           ) : users.length === 0 ? (
             <p>No users found yet.</p>
           ) : (
-            <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: '0.75rem' }}>
+            <ul className="list">
               {users.map((user) => {
                 const showAllDetails = isCurrentUserAdmin
                 const signupStatus = user.signup_email_status ?? 'not_sent'
@@ -572,50 +563,25 @@ function App() {
                 return (
                   <li
                     key={user.id}
-                    style={{
-                      border: '1px solid #2a2a2a',
-                      borderRadius: '12px',
-                      padding: '1rem',
-                      display: 'grid',
-                      gap: '0.5rem',
-                    }}
+                    className="card user-card"
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div className="user-card-header">
+                      <div className="row">
                         {user.avatar_url ? (
                           <img
                             src={user.avatar_url}
                             alt={`${user.name} avatar`}
-                            style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
+                            className="avatar avatar--lg"
                           />
                         ) : (
-                          <div
-                            style={{
-                              width: '40px',
-                              height: '40px',
-                              borderRadius: '50%',
-                              background: '#3d3d3d',
-                              display: 'grid',
-                              placeItems: 'center',
-                              color: '#fff',
-                              fontSize: '0.8rem',
-                            }}
-                          >
+                          <span className="avatar avatar--lg avatar--fallback">
                             {user.name.slice(0, 1).toUpperCase()}
-                          </div>
+                          </span>
                         )}
                         <strong>{user.name}</strong>
                       </div>
                       {showAllDetails && (
-                        <span
-                          style={{
-                            borderRadius: '999px',
-                            padding: '0.2rem 0.6rem',
-                            background: user.is_admin ? '#2f5d42' : '#3b3b3b',
-                            color: '#fff',
-                            fontSize: '0.75rem',
-                          }}
-                        >
+                        <span className={`pill${user.is_admin ? ' pill--admin' : ''}`}>
                           {user.is_admin ? 'Admin' : 'Member'}
                         </span>
                       )}
@@ -632,7 +598,7 @@ function App() {
                           Badges: {user.badges?.length ? user.badges.join(', ') : 'None'}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                        <div className="row row--between">
                           <label htmlFor={`admin-${user.id}`} style={{ fontWeight: 600 }}>
                             Admin user
                           </label>
@@ -644,7 +610,7 @@ function App() {
                           />
                         </div>
 
-                        <label style={{ display: 'grid', gap: '0.35rem' }}>
+                        <label className="stack" style={{ gap: '0.35rem' }}>
                           <span style={{ fontWeight: 600 }}>Signup email status</span>
                           <select
                             value={signupStatus}
@@ -676,26 +642,26 @@ function App() {
       ) : view === 'karaoke' ? (
         <Karaoke currentUserId={session.user.id} isCurrentUserAdmin={isCurrentUserAdmin} />
       ) : (
-        <section style={{ maxWidth: '760px', margin: '0 auto' }}>
+        <section className="page-section">
           <h2>Profile</h2>
 
-          <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem', display: 'grid', gap: '0.75rem' }}>
-            <p style={{ margin: 0 }}>
+          <div className="card stack">
+            <p>
               <strong>Name:</strong> {currentUser?.name ?? session.user.email}
             </p>
-            <p style={{ margin: 0 }}>
+            <p>
               <strong>Costume:</strong> {currentUser?.costume ?? 'Not set'}
             </p>
-            <p style={{ margin: 0 }}>
+            <p>
               <strong>Email:</strong> {currentUser?.email ?? session.user.email}
             </p>
-            <p style={{ margin: 0 }}>
+            <p>
               <strong>Admin:</strong> {isCurrentUserAdmin ? 'Yes' : 'No'}
             </p>
-            <p style={{ margin: 0 }}>
+            <p>
               <strong>Click count:</strong> {currentUser?.click_count ?? 0}
             </p>
-            <p style={{ margin: 0 }}>
+            <p>
               <strong>Badges:</strong> {currentUser?.badges?.length ? currentUser.badges.join(', ') : 'None'}
             </p>
 
@@ -703,39 +669,27 @@ function App() {
               <img
                 src={currentUser.avatar_url}
                 alt="Profile avatar"
-                style={{ width: '160px', height: '160px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #2a2a2a' }}
+                className="profile-avatar"
               />
             ) : (
-              <div
-                style={{
-                  width: '160px',
-                  height: '160px',
-                  borderRadius: '50%',
-                  border: '1px solid #2a2a2a',
-                  display: 'grid',
-                  placeItems: 'center',
-                  background: '#1d1d1d',
-                  color: '#fff',
-                  fontSize: '2rem',
-                }}
-              >
+              <div className="profile-avatar profile-avatar--fallback">
                 {currentUser?.name?.slice(0, 1)?.toUpperCase() ?? 'U'}
               </div>
             )}
 
-            <label htmlFor="profile-avatar" style={{ fontWeight: 600 }}>
+            <label htmlFor="profile-avatar">
               Profile picture
             </label>
             <input id="profile-avatar" type="file" accept="image/*" onChange={handleAvatarUpload} />
 
             {currentUser && (
-              <p style={{ margin: 0 }}>
+              <p>
                 <strong>Signup email status:</strong> {signupStatusLabels[currentUser.signup_email_status ?? 'not_sent']}
               </p>
             )}
 
-            <form onSubmit={handleSaveProfile} style={{ display: 'grid', gap: '0.75rem' }}>
-              <label htmlFor="profile-name" style={{ fontWeight: 600 }}>
+            <form onSubmit={handleSaveProfile} className="stack">
+              <label htmlFor="profile-name">
                 Name
               </label>
               <input
@@ -752,10 +706,9 @@ function App() {
                   }
                 }}
                 placeholder="Your name"
-                style={{ padding: '0.6rem 0.75rem' }}
               />
 
-              <label htmlFor="profile-costume" style={{ fontWeight: 600 }}>
+              <label htmlFor="profile-costume">
                 Costume
               </label>
               <input
@@ -772,10 +725,9 @@ function App() {
                   }
                 }}
                 placeholder="Your costume"
-                style={{ padding: '0.6rem 0.75rem' }}
               />
 
-              <label htmlFor="profile-email" style={{ fontWeight: 600 }}>
+              <label htmlFor="profile-email">
                 Email
               </label>
               <input
@@ -792,18 +744,47 @@ function App() {
                   }
                 }}
                 placeholder="Your email"
-                style={{ padding: '0.6rem 0.75rem' }}
               />
 
-              {profileError && <p role="alert" style={{ color: '#ffb4b4', margin: 0 }}>{profileError}</p>}
-              {profileMessage && <p role="status" style={{ color: '#b7f7c7', margin: 0 }}>{profileMessage}</p>}
+              {profileError && <p role="alert" className="form-error">{profileError}</p>}
+              {profileMessage && <p role="status" className="form-success">{profileMessage}</p>}
 
               <button type="submit" disabled={isSavingProfile}>
                 {isSavingProfile ? 'Saving...' : 'Save profile'}
               </button>
             </form>
+
+            <div className="row profile-actions">
+              {isCurrentUserAdmin && (
+                <button type="button" className="nav-button nav-button--admin" onClick={() => setView('admin')}>
+                  Admin panel
+                </button>
+              )}
+              <button type="button" onClick={handleLogout}>
+                Logout
+              </button>
+            </div>
           </div>
         </section>
+      )}
+
+      {session && (
+        <nav className="bottom-nav" aria-label="Primary">
+          {navItems.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              className={`bottom-nav-button${view === item.key ? ' is-active' : ''}`}
+              aria-current={view === item.key ? 'page' : undefined}
+              onClick={() => setView(item.key)}
+            >
+              <span className="bottom-nav-icon" aria-hidden="true">
+                {item.icon}
+              </span>
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
       )}
     </div>
   )

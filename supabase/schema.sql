@@ -224,11 +224,22 @@ create table if not exists public.spooks (
   user_id uuid not null references public.users(id) on delete cascade,
   caption text not null default '',
   image_url text not null,
-  tagged_user_id uuid references public.users(id) on delete set null,
   created_at timestamptz not null default now()
 );
 
 alter table public.spooks enable row level security;
+
+create table if not exists public.spook_tagged_users (
+  spook_id uuid not null references public.spooks(id) on delete cascade,
+  user_id uuid not null references public.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (spook_id, user_id)
+);
+
+alter table public.spook_tagged_users enable row level security;
+
+create index if not exists spook_tagged_users_user_id_idx
+  on public.spook_tagged_users (user_id);
 
 insert into storage.buckets (id, name, public)
 values ('spooks', 'spooks', true)
@@ -318,5 +329,42 @@ using (
     select 1 from public.users as admin_user
     where admin_user.id = auth.uid()
       and admin_user.is_admin = true
+  )
+);
+
+create policy "Public spook tags are readable"
+on public.spook_tagged_users
+for select
+to public
+using (true);
+
+create policy "Spook creators can tag users on their own spooks"
+on public.spook_tagged_users
+for insert
+to authenticated
+with check (
+  exists (
+    select 1 from public.spooks as s
+    where s.id = spook_tagged_users.spook_id
+      and s.user_id = auth.uid()
+  )
+);
+
+create policy "Spook creators and admins can remove tags"
+on public.spook_tagged_users
+for delete
+to authenticated
+using (
+  exists (
+    select 1 from public.spooks as s
+    where s.id = spook_tagged_users.spook_id
+      and (
+        s.user_id = auth.uid()
+        or exists (
+          select 1 from public.users as admin_user
+          where admin_user.id = auth.uid()
+            and admin_user.is_admin = true
+        )
+      )
   )
 );
