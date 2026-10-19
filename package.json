@@ -10,7 +10,7 @@
     "test": "vitest run",
     "preview": "vite preview",
     "supabase:push": "npx supabase db push",
-    "supabase:check": "npx supabase db push",
+    "supabase:check": "npx supabase db push --dry-run",
     "supabase:repair": "npx supabase migration repair --status reverted"
   },
   "dependencies": {
