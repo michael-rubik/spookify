@@ -37,21 +37,7 @@ export function getNormalizedSongSchedule(
     (left, right) => new Date(left.created_at ?? 0).getTime() - new Date(right.created_at ?? 0).getTime(),
   )
 
-  const activeSong = orderedSongs.find((song) => {
-    const rawStatus = (song.status ?? 'queued') as KaraokeSongStatus
-    if (rawStatus === 'completed' || rawStatus === 'skipped') {
-      return false
-    }
-
-    const startedAt = song.started_at ? new Date(song.started_at) : null
-    const endsAt = song.ends_at ? new Date(song.ends_at) : null
-
-    return rawStatus === 'playing' || !!(startedAt && endsAt && startedAt.getTime() <= now.getTime() && endsAt.getTime() > now.getTime())
-  })
-
-  const firstSongStart = orderedSongs[0]?.created_at ? new Date(orderedSongs[0].created_at) : new Date(now)
-  let scheduleCursor = activeSong?.ends_at ? new Date(activeSong.ends_at) : new Date(firstSongStart)
-  let hasActiveSong = false
+  let scheduleCursor: number | undefined
 
   return orderedSongs.map((song) => {
     const durationSeconds = Math.max(
@@ -59,49 +45,67 @@ export function getNormalizedSongSchedule(
       Number(song.duration_seconds ?? DEFAULT_KARAOKE_DURATION_SECONDS),
     )
 
-    const shouldPlayAt = activeSong && song.id === activeSong.id && activeSong.started_at
-      ? new Date(activeSong.started_at)
-      : new Date(scheduleCursor)
-    const shouldEndAt = new Date(shouldPlayAt.getTime() + durationSeconds * 1000)
     const rawStatus = (song.status ?? 'queued') as KaraokeSongStatus
-    const isExpired =
-      rawStatus !== 'completed' &&
-      rawStatus !== 'skipped' &&
-      shouldEndAt.getTime() <= now.getTime()
+    const isArchived = rawStatus === 'completed' || rawStatus === 'skipped'
+    const createdAt = new Date(song.created_at ?? now).getTime()
+    const shouldPlayAt = song.started_at
+      ? new Date(song.started_at)
+      : new Date(Math.max(scheduleCursor ?? createdAt, createdAt))
+    const shouldEndAt = isArchived && song.ends_at
+      ? new Date(song.ends_at)
+      : new Date(shouldPlayAt.getTime() + durationSeconds * 1000)
+    const isExpired = !isArchived && shouldEndAt.getTime() <= now.getTime()
 
-    if (isExpired) {
-      scheduleCursor = new Date(now)
-    } else {
-      scheduleCursor = shouldEndAt
-    }
-
-    const isCurrentSong =
-      rawStatus !== 'completed' &&
-      rawStatus !== 'skipped' &&
-      !isExpired &&
-      !hasActiveSong &&
-      (!activeSong || song.id === activeSong.id)
-
-    if (isCurrentSong) {
-      hasActiveSong = true
+    if (!isArchived) {
+      scheduleCursor = shouldEndAt.getTime()
     }
 
     const normalizedStatus: KaraokeSongStatus =
-      rawStatus === 'completed' || rawStatus === 'skipped'
+      isArchived
         ? rawStatus
         : isExpired
           ? 'completed'
-          : isCurrentSong
+          : shouldPlayAt.getTime() <= now.getTime()
             ? 'playing'
             : 'queued'
 
     return {
       ...(song as KaraokeQueueEntry),
+      status: normalizedStatus,
+      started_at: shouldPlayAt.toISOString(),
+      ends_at: shouldEndAt.toISOString(),
       duration_seconds: durationSeconds,
       normalizedStatus,
       shouldPlayAt: shouldPlayAt.toISOString(),
       shouldEndAt: shouldEndAt.toISOString(),
       isExpired,
+    }
+  })
+}
+
+// Call after a mutation, with statuses normalized before changing the queue.
+export function rescheduleKaraokeQueue(
+  songs: KaraokeQueueEntry[],
+  now: Date = new Date(),
+): KaraokeQueueEntry[] {
+  let cursor = now.getTime()
+  return [...songs].sort((left, right) =>
+    left.created_at.localeCompare(right.created_at),
+  ).map((song) => {
+    if (song.status === 'completed' || song.status === 'skipped') {
+      return song
+    }
+
+    const start = song.status === 'playing' && song.started_at
+      ? new Date(song.started_at).getTime()
+      : cursor
+    const end = start + (song.duration_seconds ?? DEFAULT_KARAOKE_DURATION_SECONDS) * 1000
+    cursor = Math.max(now.getTime(), end)
+    return {
+      ...song,
+      status: end <= now.getTime() ? 'completed' : start <= now.getTime() ? 'playing' : 'queued',
+      started_at: new Date(start).toISOString(),
+      ends_at: new Date(end).toISOString(),
     }
   })
 }

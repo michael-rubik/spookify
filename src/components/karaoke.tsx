@@ -5,6 +5,7 @@ import {
   DEFAULT_KARAOKE_DURATION_SECONDS,
   getKaraokeQueueView,
   getNormalizedSongSchedule,
+  rescheduleKaraokeQueue,
   type KaraokeQueueEntry,
 } from '../utils/karaoke'
 
@@ -59,6 +60,14 @@ const writeDevQueue = (songs: KaraokeQueueEntry[]) => {
   window.localStorage.setItem(DEV_KARAOKE_QUEUE_KEY, JSON.stringify(songs))
 }
 
+const readScheduledDevQueue = () => getNormalizedSongSchedule(readDevQueue(), new Date())
+
+const saveDevQueue = (songs: KaraokeQueueEntry[]) => {
+  const scheduled = rescheduleKaraokeQueue(songs, new Date())
+  writeDevQueue(scheduled)
+  return scheduled
+}
+
 export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
   const [queue, setQueue] = useState<KaraokeQueueEntry[]>([])
   const [draft, setDraft] = useState({ title: '', artist: '' })
@@ -69,55 +78,18 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
   const [showPastSongs, setShowPastSongs] = useState(false)
   const [now, setNow] = useState(new Date())
 
-  const syncQueueState = useCallback(async (rawSongs: KaraokeQueueEntry[]) => {
-    const scheduledSongs = getNormalizedSongSchedule(rawSongs, new Date())
-
-    const updates = scheduledSongs.filter((song) => {
-      const rawSong = rawSongs.find((entry) => entry.id === song.id)
-
-      if (!rawSong) {
-        return false
-      }
-
-      return (
-        rawSong.status !== song.normalizedStatus ||
-        (rawSong.started_at ?? '') !== song.shouldPlayAt ||
-        (rawSong.ends_at ?? '') !== song.shouldEndAt
-      )
-    })
-
-    if (updates.length === 0) {
-      return scheduledSongs
-    }
-
-    await Promise.all(
-      updates.map(async (song) => {
-        const { error: updateError } = await supabase
-          .from('karaoke_queue')
-          .update({
-            status: song.normalizedStatus,
-            started_at: song.shouldPlayAt,
-            ends_at: song.shouldEndAt,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', song.id)
-
-        if (updateError) {
-          console.error('Failed to sync karaoke queue state:', updateError)
-        }
-      }),
-    )
-
-    return scheduledSongs
-  }, [])
+  const updateDevQueue = (songs: KaraokeQueueEntry[]) => {
+    setQueue(saveDevQueue(songs))
+    setNow(new Date())
+  }
 
   const loadQueue = useCallback(async () => {
     setIsLoading(true)
     setNow(new Date())
 
     if (isDevLoginEnabled()) {
-      const devQueue = readDevQueue()
-      const scheduledSongs = getNormalizedSongSchedule(devQueue, new Date())
+      const scheduledSongs = readScheduledDevQueue()
+      writeDevQueue(scheduledSongs)
       setQueue(scheduledSongs)
       setIsLoading(false)
       setError('')
@@ -128,6 +100,7 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
       .from('karaoke_queue')
       .select('*')
       .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
 
     if (queueError) {
       console.error('Failed to load karaoke queue:', queueError)
@@ -137,11 +110,15 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
       return
     }
 
-    const scheduledSongs = await syncQueueState((data ?? []) as KaraokeQueueEntry[])
-    setQueue(scheduledSongs)
+    setQueue((data ?? []) as KaraokeQueueEntry[])
     setIsLoading(false)
     setError('')
-  }, [syncQueueState])
+  }, [])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -167,7 +144,7 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
     setStatusMessage('')
 
     if (isDevLoginEnabled()) {
-      const existingSongs = readDevQueue()
+      const existingSongs = readScheduledDevQueue()
       const nextSong: KaraokeQueueEntry = {
         id: `dev-${Date.now()}-${Math.random().toString(16).slice(2)}`,
         title: nextTitle,
@@ -183,8 +160,7 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
       }
 
       const nextQueue = [...existingSongs, nextSong]
-      writeDevQueue(nextQueue)
-      setQueue(getNormalizedSongSchedule(nextQueue, new Date()))
+      updateDevQueue(nextQueue)
       setDraft({ title: '', artist: '' })
       setStatusMessage('Song added to the karaoke queue.')
       setIsSubmitting(false)
@@ -222,7 +198,7 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
     }
 
     if (isDevLoginEnabled()) {
-      const nextQueue: KaraokeQueueEntry[] = readDevQueue().map((song) =>
+      const nextQueue: KaraokeQueueEntry[] = readScheduledDevQueue().map((song) =>
         song.id === songId
           ? {
               ...song,
@@ -233,8 +209,7 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
           : song,
       )
 
-      writeDevQueue(nextQueue)
-      setQueue(getNormalizedSongSchedule(nextQueue, new Date()))
+      updateDevQueue(nextQueue)
       setStatusMessage('Song skipped.')
       setError('')
       return
@@ -260,20 +235,24 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
   }
 
   const handleRemoveSong = async (songId: string) => {
-    if (!isCurrentUserAdmin) {
+    const song = queue.find((entry) => entry.id === songId)
+    if (!song || (!isCurrentUserAdmin && song.queued_by !== currentUserId)) {
+      setError('You can only remove your own songs.')
       return
     }
 
+    setError('')
+    setStatusMessage('')
     if (isDevLoginEnabled()) {
-      const nextQueue: KaraokeQueueEntry[] = readDevQueue().filter((song) => song.id !== songId)
-      writeDevQueue(nextQueue)
-      setQueue(getNormalizedSongSchedule(nextQueue, new Date()))
+      const nextQueue = readScheduledDevQueue().filter((entry) => entry.id !== songId)
+      updateDevQueue(nextQueue)
       setStatusMessage('Song removed from the queue.')
       setError('')
       return
     }
 
-    const { error: deleteError } = await supabase.from('karaoke_queue').delete().eq('id', songId)
+    const { error: deleteError } = await supabase
+      .from('karaoke_queue').delete().eq('id', songId).select('id').single()
 
     if (deleteError) {
       console.error('Failed to remove karaoke song:', deleteError)
@@ -293,7 +272,7 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
     const safeDuration = Math.max(1, Math.round(nextDurationSeconds))
 
     if (isDevLoginEnabled()) {
-      const nextQueue: KaraokeQueueEntry[] = readDevQueue().map((song) =>
+      const nextQueue: KaraokeQueueEntry[] = readScheduledDevQueue().map((song) =>
         song.id === songId
           ? {
               ...song,
@@ -303,8 +282,7 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
           : song,
       )
 
-      writeDevQueue(nextQueue)
-      setQueue(getNormalizedSongSchedule(nextQueue, new Date()))
+      updateDevQueue(nextQueue)
       setStatusMessage('Song length updated.')
       setError('')
       return
@@ -407,17 +385,19 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontSize: '0.8rem', color: '#a3a3a3', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        {index === 0 ? 'Now playing' : `Up next #${index + 1}`}
+                        {isCurrentlyPlaying ? 'Now playing' : `Up next #${index + 1}`}
                       </div>
                       <strong style={{ fontSize: '1.15rem' }}>{song.title}</strong>
                       <div style={{ color: '#d8d8d8' }}>{song.artist || 'Unknown artist'}</div>
                     </div>
 
-                    {isCurrentUserAdmin && (
+                    {(isCurrentUserAdmin || song.queued_by === currentUserId) && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <button type="button" onClick={() => void handleSkipSong(song.id)}>
-                          Skip
-                        </button>
+                        {isCurrentUserAdmin && (
+                          <button type="button" onClick={() => void handleSkipSong(song.id)}>
+                            Skip
+                          </button>
+                        )}
                         <button type="button" onClick={() => void handleRemoveSong(song.id)}>
                           Remove
                         </button>
