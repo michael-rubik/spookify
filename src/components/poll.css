@@ -1,0 +1,141 @@
+.poll-section {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.vote-card {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.vote-card h3 {
+  margin: 0;
+}
+
+.vote-progress {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.vote-progress-track {
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.25);
+  overflow: hidden;
+}
+
+.vote-progress-fill {
+  height: 100%;
+  background: #8b5cf6;
+  transition: width 0.8s ease;
+}
+
+.ballot-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ballot-candidates {
+  display: grid;
+  gap: 0.5rem;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.candidate-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid rgba(127, 127, 127, 0.4);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.candidate-option.is-selected {
+  border-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.15);
+}
+
+.candidate-text {
+  display: grid;
+}
+
+.vote-chart {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.vote-chart-rows {
+  position: relative;
+  transition: height 0.6s ease;
+}
+
+.vote-chart-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 52px;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  border-radius: 10px;
+  border: 1px solid rgba(127, 127, 127, 0.4);
+  background: rgba(127, 127, 127, 0.12);
+  transition: transform 1.4s ease;
+}
+
+.vote-chart-row.is-winner {
+  border-color: #f59e0b;
+}
+
+.vote-chart-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(139, 92, 246, 0.45);
+  transition: width 2.4s ease;
+}
+
+.is-winner .vote-chart-fill {
+  background: rgba(245, 158, 11, 0.55);
+}
+
+.vote-chart-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  height: 100%;
+  padding: 0 0.8rem;
+}
+
+.vote-chart-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.vote-chart-text strong,
+.vote-chart-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vote-chart-count {
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vote-chart-row,
+  .vote-chart-fill,
+  .vote-progress-fill {
+    transition: none;
+  }
+}

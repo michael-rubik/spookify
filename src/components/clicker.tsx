@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getUnlockedBadges, grantBadges } from '../utils/badges'
 import { supabase } from '../utils/supabase/supabase-client'
+
+type WinnerBadge = { vote_id: string; category: string }
 
 type ClickerProps = {
   userId: string
@@ -15,6 +17,27 @@ export const Clicker = ({ userId, clickCount, badges, dismissedBadgeIds, onProgr
   const [count, setCount] = useState(clickCount)
   const [isUpdating, setIsUpdating] = useState(false)
   const [showAll, setShowAll] = useState(false)
+  const [winnerBadges, setWinnerBadges] = useState<WinnerBadge[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadWinnerBadges = async () => {
+      const { data, error } = await supabase
+        .from('vote_winners')
+        .select('vote_id, votes(category)')
+        .eq('user_id', userId)
+      if (cancelled || error) return
+
+      const rows = (data ?? []) as unknown as { vote_id: string; votes: { category: string } | null }[]
+      setWinnerBadges(rows.flatMap((row) => (row.votes ? [{ vote_id: row.vote_id, category: row.votes.category }] : [])))
+    }
+
+    void loadWinnerBadges()
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
 
   const [prevClickCount, setPrevClickCount] = useState(clickCount)
   if (prevClickCount !== clickCount) {
@@ -64,6 +87,15 @@ export const Clicker = ({ userId, clickCount, badges, dismissedBadgeIds, onProgr
           </button>
         </div>
       ))}
+      {winnerBadges.length > 0 && (
+        <ul className="list" aria-label="Winner badges">
+          {winnerBadges.map((badge) => (
+            <li key={badge.vote_id} data-testid="winner-badge">
+              🏆 Gewinner von {badge.category}
+            </li>
+          ))}
+        </ul>
+      )}
       {unlocked.length > 0 && (
         <>
           <button type="button" onClick={() => setShowAll((current) => !current)}>

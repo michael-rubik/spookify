@@ -30,3 +30,5 @@ test-results/
 *.njsproj
 *.sln
 *.sw?
+
+e2e/.generated/

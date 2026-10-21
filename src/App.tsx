@@ -5,8 +5,10 @@ import { supabase } from './utils/supabase/supabase-client'
 import { Auth } from './components/auth'
 import { Clicker } from './components/clicker'
 import { Karaoke } from './components/karaoke'
+import { Poll } from './components/poll'
 import { SignupCodes } from './components/signup-codes'
 import { Spooks } from './components/spooks'
+import { VotesAdmin } from './components/votes-admin'
 import { grantBadges } from './utils/badges'
 import { getDevAdminUser, getDevSession, isDevLoginEnabled } from './utils/dev-login'
 
@@ -52,7 +54,8 @@ function App() {
       : [],
   )
   const [loadingUsers, setLoadingUsers] = useState(false)
-  const [view, setView] = useState<'clicker' | 'profile' | 'users' | 'spooks' | 'karaoke' | 'admin'>('clicker')
+  const [view, setView] = useState<'clicker' | 'profile' | 'users' | 'spooks' | 'karaoke' | 'poll' | 'admin'>('clicker')
+  const [hasVotes, setHasVotes] = useState(false)
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>(emptyProfileDraft)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [profileError, setProfileError] = useState('')
@@ -129,7 +132,30 @@ function App() {
     }
   }, [session])
 
-  
+  // The Poll view stays hidden until the first vote has been started.
+  useEffect(() => {
+    if (!session || isDevLoginEnabled()) {
+      return
+    }
+
+    let cancelled = false
+    const loadHasVotes = async () => {
+      const { count, error } = await supabase.from('votes').select('id', { count: 'exact', head: true })
+      if (cancelled || error) return
+      setHasVotes((count ?? 0) > 0)
+    }
+
+    void loadHasVotes()
+    const timer = window.setInterval(() => void loadHasVotes(), 15000)
+    const onFocus = () => void loadHasVotes()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [session])
+
 
   const handleLogout = async () => {
     if (isDevLoginEnabled()) {
@@ -444,6 +470,7 @@ function App() {
     { key: 'clicker', label: 'Clicker', icon: '👻' },
     { key: 'spooks', label: 'Spooks', icon: '🎃' },
     { key: 'karaoke', label: 'Karaoke', icon: '🎤' },
+    ...(hasVotes ? [{ key: 'poll' as const, label: 'Poll', icon: '🗳️' }] : []),
     { key: 'users', label: 'Users', icon: '🧟' },
     { key: 'profile', label: 'Profile', icon: '🎭' },
   ]
@@ -492,6 +519,15 @@ function App() {
             >
               Karaoke
             </button>
+            {hasVotes && (
+              <button
+                type="button"
+                className={`nav-button${view === 'poll' ? ' is-active' : ''}`}
+                onClick={() => setView('poll')}
+              >
+                Poll
+              </button>
+            )}
             {isCurrentUserAdmin && (
               <button
                 type="button"
@@ -573,6 +609,7 @@ function App() {
               </div>
 
               <SignupCodes />
+              <VotesAdmin />
             </>
           )}
         </section>
@@ -671,6 +708,8 @@ function App() {
         <Spooks users={users} currentUserId={session.user.id} isAdmin={isCurrentUserAdmin} />
       ) : view === 'karaoke' ? (
         <Karaoke currentUserId={session.user.id} isCurrentUserAdmin={isCurrentUserAdmin} />
+      ) : view === 'poll' ? (
+        <Poll currentUserId={session.user.id} users={users} />
       ) : (
         <section className="page-section">
           <h2>Profile</h2>

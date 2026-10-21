@@ -62,3 +62,19 @@ Development login mirrors these scheduling rules in local storage. The UI advanc
 the displayed status and countdown every second; refresh fetches other users' changes.
 Database regression tests use an isolated in-memory Postgres instance (PGlite), not
 the linked Supabase project.
+
+## Votes
+
+Apply `20261028_add_votes.sql` before deploying the Poll view. Admins start, end,
+reset and delete votes through `security definer` functions; members cast one
+anonymous ballot per vote with `cast_ballot`. Who voted (`vote_participation`) and
+what was chosen (`vote_tallies`) live in separate tables with no link and no
+timestamps, and tallies are readable only after the vote ends. See
+`docs/adr/0001-anonymous-ballots.md`.
+
+## End-to-end tests
+
+`npm run test:e2e` runs Playwright against a throwaway Postgres + PostgREST in a
+podman pod (`podman machine start` first), never the hosted project. The voting
+story uses one admin and four member browser contexts, and the teardown asserts
+that no vote data remains before the pod is removed.

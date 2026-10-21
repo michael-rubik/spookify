@@ -1,0 +1,33 @@
+import { readFileSync } from 'node:fs'
+import { expect, test } from '@playwright/test'
+import { AUTH_STORAGE_KEY, NO_TRACES, sessionFor, sql, voteTraces, type TestUser } from './support/stack'
+
+const users: TestUser[] = JSON.parse(readFileSync('e2e/.generated/users.json', 'utf8'))
+const ann = users.find((user) => user.name === 'Ann')!
+
+test.afterAll(() => {
+  sql('delete from public.votes')
+  expect(voteTraces()).toBe(NO_TRACES)
+})
+
+test('tapping a live chart bar reveals the user and costume', async ({ page }) => {
+  sql(`
+    with v as (insert into public.votes (category) values ('Scariest') returning id)
+    insert into public.vote_participation (vote_id, user_id) select id, '${ann.id}' from v
+  `)
+
+  await page.addInitScript(
+    ([key, value]) => window.localStorage.setItem(key, value),
+    [AUTH_STORAGE_KEY, JSON.stringify(sessionFor(ann))],
+  )
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Poll', exact: true }).tap()
+
+  const bars = page.getByTestId('vote-bar')
+  await expect(bars).toHaveCount(3)
+  await expect(bars.first()).toContainText('Costume #')
+
+  await bars.first().tap()
+  // The chart reorders on its own, so look at any bar rather than the tapped rank.
+  await expect(bars.filter({ hasText: /costume$/ })).toHaveCount(1)
+})
