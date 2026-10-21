@@ -1,6 +1,39 @@
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { normalizeSpookRow, sortSpooksByNewest } from './spooks'
+import {
+  getSpookPermissions,
+  getSpookStoragePath,
+  normalizeSpookRow,
+  sortSpooksByNewest,
+} from './spooks'
+
+describe('getSpookPermissions', () => {
+  const spook = { user_id: 'owner' }
+
+  it('lets the owner edit and delete', () => {
+    expect(getSpookPermissions(spook, 'owner', false)).toEqual({ canEdit: true, canDelete: true })
+  })
+
+  it('lets admins delete but not edit others spooks', () => {
+    expect(getSpookPermissions(spook, 'admin', true)).toEqual({ canEdit: false, canDelete: true })
+  })
+
+  it('gives other members no controls', () => {
+    expect(getSpookPermissions(spook, 'other', false)).toEqual({ canEdit: false, canDelete: false })
+  })
+})
+
+describe('getSpookStoragePath', () => {
+  it('extracts the object path from a public url', () => {
+    expect(
+      getSpookStoragePath('https://x.supabase.co/storage/v1/object/public/spooks/u-1-a%20b.png'),
+    ).toBe('u-1-a b.png')
+  })
+
+  it('returns null for foreign urls', () => {
+    expect(getSpookStoragePath('https://example.test/boo.png')).toBeNull()
+  })
+})
 
 const spookStyles = fs.readFileSync(new URL('../components/spooks.css', import.meta.url), 'utf8')
 

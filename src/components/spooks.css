@@ -25,6 +25,17 @@
 }
 
 /* Mobile-first: creation form collapses behind the toggle button. */
+.spook-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.spook-card-edit {
+  display: grid;
+  gap: 0.6rem;
+}
+
 .spooks-form.is-hidden {
   display: none;
 }

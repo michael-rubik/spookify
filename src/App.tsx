@@ -668,7 +668,7 @@ function App() {
           )}
         </section>
       ) : view === 'spooks' ? (
-        <Spooks users={users} currentUserId={session.user.id} />
+        <Spooks users={users} currentUserId={session.user.id} isAdmin={isCurrentUserAdmin} />
       ) : view === 'karaoke' ? (
         <Karaoke currentUserId={session.user.id} isCurrentUserAdmin={isCurrentUserAdmin} />
       ) : (
