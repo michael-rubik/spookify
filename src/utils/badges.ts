@@ -1,17 +1,36 @@
+export type BadgeDefinition = {
+  id: string
+  threshold: number
+  message: string
+}
+
 export const CLICKER_BADGE_ID = 'clicker'
 
-export function getUserBadges(clickCount: number, existingBadges: string[] | null | undefined = []): string[] {
-  const badges = new Set(
-    (existingBadges ?? []).filter(
-      (badge): badge is string => typeof badge === 'string' && badge.trim().length > 0,
-    ),
-  )
+// Ordered by ascending threshold. Add future badges here.
+export const BADGES: readonly BadgeDefinition[] = [
+  {
+    id: CLICKER_BADGE_ID,
+    threshold: 500,
+    message: 'Kostüm Hack entdeckt! Du kannst Michi fragen, wenn du Gewand ausborgen magst.',
+  },
+]
 
-  if (clickCount >= 500) {
-    badges.add(CLICKER_BADGE_ID)
-  } else {
-    badges.delete(CLICKER_BADGE_ID)
+const cleanIds = (ids: readonly unknown[] | null | undefined): string[] =>
+  (ids ?? []).filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+
+// Add-only: returns the existing ids plus any badge whose threshold has been reached.
+export function grantBadges(clickCount: number, existingIds: readonly string[] | null | undefined = []): string[] {
+  const granted = new Set(cleanIds(existingIds))
+  for (const badge of BADGES) {
+    if (clickCount >= badge.threshold) {
+      granted.add(badge.id)
+    }
   }
+  return Array.from(granted)
+}
 
-  return Array.from(badges)
+// Pure lookup of unlocked badges in threshold order; unknown ids are ignored.
+export function getUnlockedBadges(ids: readonly string[] | null | undefined): BadgeDefinition[] {
+  const unlocked = new Set(cleanIds(ids))
+  return BADGES.filter((badge) => unlocked.has(badge.id))
 }

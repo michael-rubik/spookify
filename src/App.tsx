@@ -6,7 +6,7 @@ import { Auth } from './components/auth'
 import { Clicker } from './components/clicker'
 import { Karaoke } from './components/karaoke'
 import { Spooks } from './components/spooks'
-import { getUserBadges } from './utils/badges'
+import { grantBadges } from './utils/badges'
 import { getDevAdminUser, getDevSession, isDevLoginEnabled } from './utils/dev-login'
 
 type UserProfile = {
@@ -19,6 +19,7 @@ type UserProfile = {
   is_admin: boolean
   click_count: number
   signup_email_status: string | null
+  deletion_pending_at?: string | null
 }
 
 type ProfileDraft = {
@@ -64,6 +65,13 @@ function App() {
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [profileError, setProfileError] = useState('')
   const [profileMessage, setProfileMessage] = useState('')
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
+  const [dismissedBadgeIds, setDismissedBadgeIds] = useState<string[]>([])
+  const [deletionError, setDeletionError] = useState('')
+  const [deletionMessage, setDeletionMessage] = useState('')
+  const [accountStatus, setAccountStatus] = useState<'checking' | 'active' | 'pending' | 'missing' | 'error'>(
+    () => isDevLoginEnabled() ? 'active' : 'checking',
+  )
 
   useEffect(() => {
     if (isDevLoginEnabled()) {
@@ -92,75 +100,41 @@ function App() {
     }
   }, [])
 
-  const ensureCurrentUserProfile = async (user: Session['user']) => {
-    if (!user || isDevLoginEnabled()) {
-      return
-    }
-
-    const nextName = (user.user_metadata?.name as string | undefined)?.trim() || user.email?.split('@')[0] || 'User'
-    const nextCostume = (user.user_metadata?.costume as string | undefined)?.trim() || 'Unknown'
-    const nextEmail = (user.email ?? '').trim()
-
-    if (!nextEmail) {
-      return
-    }
-
-    const { data: existingUser, error: lookupError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    if (lookupError && lookupError.code !== 'PGRST116') {
-      console.error('Failed to look up current user profile:', lookupError)
-      return
-    }
-
-    if (existingUser) {
-      return
-    }
-
-    const { error: insertError } = await supabase.from('users').insert({
-      id: user.id,
-      name: nextName,
-      costume: nextCostume,
-      email: nextEmail,
-      avatar_url: null,
-      badges: [],
-      is_admin: false,
-      click_count: 0,
-      signup_email_status: 'not_sent',
-    })
-
-    if (insertError) {
-      console.error('Failed to create current user profile:', insertError)
-    }
-  }
-
   useEffect(() => {
-    if (!session) {
+    if (!session || isDevLoginEnabled()) {
       return
     }
 
+    let cancelled = false
     const loadUsers = async () => {
-      await ensureCurrentUserProfile(session.user)
-
       setLoadingUsers(true)
 
       const { data, error } = await supabase.from('users').select('*').order('name', { ascending: true })
+      if (cancelled) return
 
       if (error) {
         console.error('Failed to load users:', error)
-        setUsers([])
+        setAccountStatus('error')
         setLoadingUsers(false)
         return
       }
 
-      setUsers((data ?? []) as UserProfile[])
+      const profiles = (data ?? []) as UserProfile[]
+      const ownProfile = profiles.find((user) => user.id === session.user.id)
+      setAccountStatus(!ownProfile ? 'missing' : ownProfile.deletion_pending_at ? 'pending' : 'active')
+      setUsers(profiles)
       setLoadingUsers(false)
     }
 
-    loadUsers()
+    void loadUsers()
+    const timer = window.setInterval(() => void loadUsers(), 15000)
+    const onFocus = () => void loadUsers()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+    }
   }, [session])
 
   
@@ -181,7 +155,7 @@ function App() {
   }
 
   const currentUser = users.find((user) => user.id === session?.user.id) ?? null
-  const isCurrentUserAdmin = Boolean(currentUser?.is_admin)
+  const isCurrentUserAdmin = accountStatus === 'active' && Boolean(currentUser?.is_admin && !currentUser.deletion_pending_at)
   const hasAnyAdminUsers = users.some((user) => user.is_admin)
   const pendingLogins = users.filter((user) => user.signup_email_status === 'pending' || user.signup_email_status === 'not_sent').length
   const verificationLinksSent = users.filter((user) => user.signup_email_status === 'sent').length
@@ -337,9 +311,9 @@ function App() {
       return
     }
 
-    const updatedUsers = users.map((user) => ({
+    const updatedUsers = users.filter((user) => !user.deletion_pending_at).map((user) => ({
       ...user,
-      badges: getUserBadges(user.click_count, user.badges),
+      badges: grantBadges(user.click_count, user.badges),
     }))
 
     await Promise.all(
@@ -352,7 +326,36 @@ function App() {
       }),
     )
 
-    setUsers(updatedUsers)
+    setUsers((current) => current.map((user) => updatedUsers.find((updated) => updated.id === user.id) ?? user))
+  }
+
+  const handleResetBadges = async () => {
+    if (!isCurrentUserAdmin) {
+      return
+    }
+
+    if (!window.confirm('Reset all badges and click counts for every user? This cannot be undone.')) {
+      return
+    }
+
+    const targets = users.filter((user) => !user.deletion_pending_at)
+    const results = await Promise.all(
+      targets.map(async (user) => {
+        const { error } = await supabase.from('users').update({ badges: [], click_count: 0 }).eq('id', user.id)
+
+        if (error) {
+          console.error('Failed to reset badges for user:', user.id, error)
+        }
+
+        return error ? null : user.id
+      }),
+    )
+    const resetIds = new Set(results.filter((id): id is string => id !== null))
+
+    setUsers((current) =>
+      current.map((user) => (resetIds.has(user.id) ? { ...user, badges: [], click_count: 0 } : user)),
+    )
+    setDismissedBadgeIds([])
   }
 
   const handleUpdateSignupStatus = async (userId: string, nextStatus: string) => {
@@ -385,20 +388,52 @@ function App() {
       return
     }
 
-    const confirmed = window.confirm(`Delete ${targetUser.name}? This cannot be undone.`)
+    setDeletionError('')
+    setDeletionMessage('')
+    if (isDevLoginEnabled()) {
+      setDeletionError('Account deletion requires a real Supabase admin session, not development login.')
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Permanently delete ${targetUser.name} (${targetUser.email})? Their login account, avatar, spooks, images, and karaoke entries will be deleted, and their tags removed from other spooks. This cannot be undone.`,
+    )
 
     if (!confirmed) {
       return
     }
 
-    const { error } = await supabase.from('users').delete().eq('id', userId)
-
-    if (error) {
-      console.error('Failed to delete user:', error)
-      return
+    setDeletingUserId(userId)
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-account', { body: { userId } })
+      if (error) {
+        let message = 'Deletion could not be confirmed. Refresh the user list and retry if the account remains.'
+        if ('context' in error && error.context instanceof Response) {
+          const body: unknown = await error.context.json().catch(() => null)
+          if (body && typeof body === 'object' && 'error' in body && typeof body.error === 'string') {
+            message = body.error
+          }
+        }
+        throw new Error(message)
+      }
+      if (!data || data.success !== true) {
+        throw new Error('Deletion could not be confirmed. Refresh the user list before retrying.')
+      }
+      setUsers((current) => current.filter((user) => user.id !== userId))
+      setDeletionMessage(`${targetUser.name}'s account and owned content were permanently deleted.`)
+    } catch (error) {
+      console.error('Account deletion did not complete:', error)
+      setDeletionError(error instanceof Error ? error.message : 'Deletion could not be confirmed.')
+    } finally {
+      const { data, error } = await supabase.from('users').select('*').order('name', { ascending: true })
+      if (error) {
+        console.error('Failed to refresh users after deletion:', error)
+        setDeletionError((message) => `${message ? `${message} ` : ''}The user list could not be refreshed. Reload before retrying.`)
+      } else {
+        setUsers((data ?? []) as UserProfile[])
+      }
+      setDeletingUserId(null)
     }
-
-    setUsers((currentUsers) => currentUsers.filter((user) => user.id !== userId))
   }
 
   const handlePromoteSelfToAdmin = async () => {
@@ -420,30 +455,18 @@ function App() {
     )
   }
 
-  const updateUserCount = (userId: string, nextCount: number) => {
+  const updateUserProgress = (userId: string, nextCount: number, nextBadges: string[]) => {
     setUsers((currentUsers) =>
-      currentUsers.map((user) => {
-        if (user.id !== userId) {
-          return user
-        }
-
-        const nextBadges = getUserBadges(nextCount, user.badges)
-
-        return {
-          ...user,
-          click_count: nextCount,
-          badges: nextBadges,
-        }
-      }),
+      currentUsers.map((user) =>
+        user.id === userId ? { ...user, click_count: nextCount, badges: nextBadges } : user,
+      ),
     )
+    // Forget dismissals for badges that are no longer held (e.g. after a failed save).
+    setDismissedBadgeIds((current) => current.filter((id) => nextBadges.includes(id)))
+  }
 
-    void supabase
-      .from('users')
-      .update({
-        click_count: nextCount,
-        badges: getUserBadges(nextCount, users.find((user) => user.id === userId)?.badges ?? []),
-      })
-      .eq('id', userId)
+  const handleDismissBadge = (badgeId: string) => {
+    setDismissedBadgeIds((current) => (current.includes(badgeId) ? current : [...current, badgeId]))
   }
 
   const navItems: { key: typeof view; label: string; icon: string }[] = [
@@ -525,6 +548,7 @@ function App() {
             }
 
             setSession(devSession)
+            setAccountStatus('active')
             setUsers([
               {
                 id: devUser.id,
@@ -541,11 +565,24 @@ function App() {
             setView('clicker')
           }}
         />
+      ) : accountStatus !== 'active' ? (
+        <section className="page-section">
+          <h2>Account access</h2>
+          <p role="alert">
+            {accountStatus === 'checking' ? 'Checking your account...'
+              : accountStatus === 'pending' ? 'Your account is pending permanent deletion. Changes and uploads are blocked.'
+                : accountStatus === 'missing' ? 'Your account is no longer available. Sign out to continue.'
+                  : 'Your account could not be checked. Changes are unavailable; refresh to retry.'}
+          </p>
+        </section>
       ) : view === 'clicker' ? (
         <Clicker
           userId={session.user.id}
           clickCount={currentUser?.click_count ?? 0}
-          onCountChange={(nextCount) => updateUserCount(session.user.id, nextCount)}
+          badges={currentUser?.badges ?? []}
+          dismissedBadgeIds={dismissedBadgeIds}
+          onProgress={(nextCount, nextBadges) => updateUserProgress(session.user.id, nextCount, nextBadges)}
+          onDismissBadge={handleDismissBadge}
         />
       ) : view === 'admin' ? (
         <section className="page-section">
@@ -568,8 +605,11 @@ function App() {
 
               <div className="card">
                 <div className="row row--between">
-                  <h3 style={{ margin: 0 }}>Badge refresh</h3>
-                  <button type="button" onClick={handleRefreshBadges}>Refresh all badges</button>
+                  <h3 style={{ margin: 0 }}>Badges</h3>
+                  <div className="row">
+                    <button type="button" onClick={handleRefreshBadges}>Refresh all badges</button>
+                    <button type="button" onClick={handleResetBadges}>Reset all badges</button>
+                  </div>
                 </div>
               </div>
 
@@ -593,6 +633,8 @@ function App() {
       ) : view === 'users' ? (
         <section className="page-section">
           <h2>Users</h2>
+          {deletionError && <p role="alert">{deletionError}</p>}
+          {deletionMessage && <p role="status">{deletionMessage}</p>}
 
           {!hasAnyAdminUsers && currentUser && (
             <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', border: '1px solid #3b3b3b', borderRadius: '10px' }}>
@@ -634,6 +676,7 @@ function App() {
                           </span>
                         )}
                         <strong>{user.name}</strong>
+                        {user.deletion_pending_at && <span className="pill">Deletion pending</span>}
                       </div>
                       {showAllDetails && (
                         <span className={`pill${user.is_admin ? ' pill--admin' : ''}`}>
@@ -661,6 +704,7 @@ function App() {
                             id={`admin-${user.id}`}
                             type="checkbox"
                             checked={user.is_admin}
+                            disabled={Boolean(user.deletion_pending_at) || deletingUserId !== null}
                             onChange={() => handleToggleAdmin(user.id, user.is_admin)}
                           />
                         </div>
@@ -669,6 +713,7 @@ function App() {
                           <span style={{ fontWeight: 600 }}>Signup email status</span>
                           <select
                             value={signupStatus}
+                            disabled={Boolean(user.deletion_pending_at) || deletingUserId !== null}
                             onChange={(event) => handleUpdateSignupStatus(user.id, event.target.value)}
                           >
                             {signupStatusOptions.map((option) => (
@@ -680,8 +725,8 @@ function App() {
                         </label>
 
                         {user.id !== session.user.id && (
-                          <button type="button" onClick={() => handleDeleteUser(user.id)}>
-                            Delete user
+                          <button type="button" disabled={deletingUserId !== null} onClick={() => handleDeleteUser(user.id)}>
+                            {deletingUserId === user.id ? 'Deleting account...' : user.deletion_pending_at ? 'Retry permanent deletion' : 'Delete user permanently'}
                           </button>
                         )}
                       </>

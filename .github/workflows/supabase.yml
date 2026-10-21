@@ -1,4 +1,4 @@
-name: Deploy Supabase migrations
+name: Deploy Supabase backend
 
 on:
   push:
@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - supabase/migrations/**
+      - supabase/functions/**
+      - supabase/config.toml
       - .github/workflows/supabase.yml
   workflow_dispatch:
 
@@ -44,9 +46,6 @@ jobs:
         with:
           version: 2.121.0
 
-      - name: Initialize CLI configuration
-        run: supabase init --yes
-
       - name: Link Supabase project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
 
@@ -55,3 +54,6 @@ jobs:
 
       - name: Apply pending migrations
         run: supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --yes
+
+      - name: Deploy account deletion function
+        run: supabase functions deploy delete-account --project-ref "$SUPABASE_PROJECT_ID" --use-api --import-map supabase/functions/deno.json

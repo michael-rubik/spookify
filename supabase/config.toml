@@ -1,0 +1,3 @@
+[functions.delete-account]
+verify_jwt = true
+import_map = "./functions/deno.json"
