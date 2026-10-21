@@ -14,7 +14,7 @@ jobs:
       - name: Install
         run: npm ci
       - name: Run migration check
-        run: node scripts/check-migrations.js
+        run: node scripts/check-migrations.cjs
       - name: Markdown link check
         run: |
           npm install -g markdown-link-check
