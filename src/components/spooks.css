@@ -25,6 +25,28 @@
 }
 
 /* Mobile-first: creation form collapses behind the toggle button. */
+.spook-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.spook-photo-button {
+  cursor: pointer;
+  padding: 0.6em 1.2em;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .spook-card-actions {
   display: flex;
   gap: 0.5rem;

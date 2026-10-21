@@ -88,6 +88,10 @@ export function Spooks({ currentUserId, users, isAdmin = false }: SpooksProps) {
     if (fileInput) {
       fileInput.value = ''
     }
+    const cameraInput = document.getElementById('spook-camera') as HTMLInputElement | null
+    if (cameraInput) {
+      cameraInput.value = ''
+    }
   }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -336,8 +340,31 @@ export function Spooks({ currentUserId, users, isAdmin = false }: SpooksProps) {
             })}
           </div>
 
-          <label htmlFor="spook-image">Upload image</label>
-          <input id="spook-image" type="file" accept="image/*" onChange={handleFileChange} />
+          <span className="field-label">Photo</span>
+          <div className="spook-photo-actions">
+            <label htmlFor="spook-camera" className="spook-photo-button">
+              📷 Take photo
+            </label>
+            <label htmlFor="spook-image" className="spook-photo-button">
+              🖼️ Choose from gallery
+            </label>
+          </div>
+          {/* capture opens the native camera on Android and iOS; desktop falls back to a file picker */}
+          <input
+            id="spook-camera"
+            className="visually-hidden"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileChange}
+          />
+          <input
+            id="spook-image"
+            className="visually-hidden"
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+          />
 
           {selectedFile && <div className="muted spooks-selected-file">Selected: {selectedFile.name}</div>}
 
