@@ -9,7 +9,6 @@ type DevAdminUser = {
   badges: string[]
   is_admin: boolean
   click_count: number
-  signup_email_status: 'not_sent' | 'pending' | 'sent' | 'failed'
 }
 
 export const isDevLoginEnabled = () => String(import.meta.env.VITE_ENV ?? '').toUpperCase() === 'DEV'
@@ -28,7 +27,6 @@ export const getDevAdminUser = (): DevAdminUser | null => {
     badges: [],
     is_admin: true,
     click_count: 0,
-    signup_email_status: 'sent',
   }
 }
 

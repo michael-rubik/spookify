@@ -41,10 +41,11 @@ describe.each([
   }, 20000)
   afterAll(async () => { await db.close() })
   beforeEach(async () => {
-    await db.exec('reset role; delete from storage.objects; delete from auth.users')
+    await db.exec('reset role; delete from storage.objects; delete from auth.users; delete from public.signup_codes')
+    await db.exec("insert into public.signup_codes (code, seats) values ('TEST', 100)")
     await db.query(`
-      insert into auth.users (id,email) values
-        ($1,'admin@example.com'), ($2,'target@example.com'), ($3,'other@example.com')
+      insert into auth.users (id,email,raw_user_meta_data) values
+        ($1,'admin@example.com','{"signup_code":"TEST"}'), ($2,'target@example.com','{"signup_code":"TEST"}'), ($3,'other@example.com','{"signup_code":"TEST"}')
     `, [admin, target, other])
     await db.query('update public.users set is_admin = true where id = $1', [admin])
   })
@@ -138,7 +139,7 @@ describe.each([
     expect(queue.map((song) => song.title)).toEqual(['Current', 'Last'])
     expect(queue[0].started_at).toEqual(current.started_at)
     expect(queue[1].started_at).toEqual(current.ends_at)
-    await db.query("insert into auth.users (id,email,raw_user_meta_data) values ($1,'target@example.com','{\"is_admin\":true}')", ['00000000-0000-0000-0000-000000000004'])
+    await db.query("insert into auth.users (id,email,raw_user_meta_data) values ($1,'target@example.com','{\"is_admin\":true,\"signup_code\":\"TEST\"}')", ['00000000-0000-0000-0000-000000000004'])
     const fresh = (await db.query<{ is_admin: boolean; click_count: number; deletion_pending_at: Date | null }>("select * from public.users where email = 'target@example.com'")).rows[0]
     expect(fresh).toMatchObject({ is_admin: false, click_count: 0, deletion_pending_at: null })
     await asUser(target)

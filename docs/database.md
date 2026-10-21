@@ -6,6 +6,25 @@ When changing schema, create a migration and keep `schema.sql` in sync.
 
 Refer to `README.md` for detailed migration safety and reset workflows.
 
+## Signup codes
+
+Creating an account requires a signup code (`public.signup_codes`: `code`, `seats`,
+`seats_used`). The client sends it as `signup_code` in the signUp metadata, and
+`handle_new_user` redeems it atomically with account creation. An unknown or full code
+aborts the insert into `auth.users`; Auth reports that only as "Database error saving
+new user", which the sign-up form shows as the German "invalid code" message.
+
+- Codes match ignoring case and surrounding whitespace and are unique.
+- A seat is taken at account creation and is never freed, including when the user is
+  deleted. Removing a code stops it working and nulls `users.signup_code_id`.
+- Only active admins can read, add, resize, and remove codes (RLS). `seats_used` and
+  `code` cannot be edited by clients, and seats cannot drop below `seats_used`.
+- Every insert into `auth.users` needs a code, including accounts created from the
+  Supabase dashboard (put `signup_code` in the user metadata).
+- Email confirmation is off (`enable_confirmations = false` in `config.toml`, which
+  `db push` does not apply). Also turn off "Confirm email" in the hosted project under
+  Authentication → Providers → Email. `users.signup_email_status` was dropped.
+
 ## Permanent account deletion
 
 Migrations apply in filename order; `20261025_permanent_account_deletion.sql` follows

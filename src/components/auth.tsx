@@ -6,6 +6,7 @@ import { isDevLoginEnabled } from '../utils/dev-login'
 type AuthMode = 'sign-in' | 'sign-up'
 
 type FormState = {
+  signupCode: string
   name: string
   costume: string
   email: string
@@ -13,6 +14,7 @@ type FormState = {
 }
 
 const initialForm: FormState = {
+  signupCode: '',
   name: '',
   costume: '',
   email: '',
@@ -22,6 +24,8 @@ const initialForm: FormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const isValidEmail = (value: string) => EMAIL_REGEX.test(value.trim())
+
+const INVALID_SIGNUP_CODE_MESSAGE = 'Dieser Code hilft dir nicht, frag Rubik nach einem SignUp Code'
 
 type AuthProps = {
   onDevLogin?: () => void
@@ -72,14 +76,16 @@ export const Auth = ({ onDevLogin }: AuthProps) => {
       if (mode === 'sign-up') {
         const cleanedName = form.name.trim()
         const cleanedCostume = form.costume.trim()
+        const cleanedSignupCode = form.signupCode.trim()
 
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email: cleanedEmail,
           password: form.password,
           options: {
             data: {
               name: cleanedName,
               costume: cleanedCostume,
+              signup_code: cleanedSignupCode,
             },
           },
         })
@@ -88,9 +94,19 @@ export const Auth = ({ onDevLogin }: AuthProps) => {
           throw signUpError
         }
 
+        if (!signUpData.session) {
+          const { error: autoSignInError } = await supabase.auth.signInWithPassword({
+            email: cleanedEmail,
+            password: form.password,
+          })
+
+          if (autoSignInError) {
+            throw autoSignInError
+          }
+        }
+
         setForm(initialForm)
-        setMode('sign-in')
-        setMessage('Account created successfully. You can sign in now.')
+        setMessage('Automatically signed in.')
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: cleanedEmail,
@@ -105,10 +121,10 @@ export const Auth = ({ onDevLogin }: AuthProps) => {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong.'
-      const lowerMessage = message.toLowerCase()
 
-      if (lowerMessage.includes('rate limit')) {
-        setError('Too many signup attempts. Please wait a few minutes and use a valid email address you can access.')
+      // Auth reports a rejected signup code only as a generic database error.
+      if (mode === 'sign-up' && message.toLowerCase().includes('database error saving new user')) {
+        setError(INVALID_SIGNUP_CODE_MESSAGE)
         return
       }
 
@@ -133,9 +149,20 @@ export const Auth = ({ onDevLogin }: AuthProps) => {
       <form onSubmit={handleSubmit} className="auth-form">
         <div className="auth-hint">
           {mode === 'sign-up'
-            ? 'Use a real email address you can access. Supabase blocks repeated signup attempts.'
+            ? 'You need a signup code to create an account.'
             : 'Use the email and password for your existing account.'}
         </div>
+
+        {mode === 'sign-up' && (
+          <input
+            type="text"
+            placeholder="Signup code"
+            value={form.signupCode}
+            onChange={updateField('signupCode')}
+            autoComplete="off"
+            required
+          />
+        )}
 
         {mode === 'sign-up' && (
           <input
@@ -177,12 +204,6 @@ export const Auth = ({ onDevLogin }: AuthProps) => {
 
         {error && <p role="alert" className="form-error">{error}</p>}
         {message && <p role="status" className="form-success">{message}</p>}
-
-        {mode === 'sign-up' && (
-          <div className="auth-hint" style={{ fontSize: '0.8rem' }}>
-            Tip: a valid email is required for account creation, and repeated attempts may be temporarily blocked.
-          </div>
-        )}
 
         <button type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Please wait...' : mode === 'sign-up' ? 'Sign Up' : 'Sign In'}

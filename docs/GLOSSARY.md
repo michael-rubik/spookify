@@ -2,6 +2,10 @@
 
 **User** — A registered person with a public profile. Created automatically at signup; may be an admin.
 
+**Signup code** — A code a new person must present to create an account. Each code has a fixed number of seats. Matching ignores case and surrounding whitespace. Added and removed by admins.
+
+**Seat** — One permitted signup under a signup code. A seat is taken the moment an account is created with that code. Existing users predate the system and need no code.
+
 **Spook** — A photo post by one user, optionally tagging other users.
 
 **Tag** — The link between a spook and a tagged user. A spook may have no tags.

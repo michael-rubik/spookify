@@ -5,6 +5,7 @@ import { supabase } from './utils/supabase/supabase-client'
 import { Auth } from './components/auth'
 import { Clicker } from './components/clicker'
 import { Karaoke } from './components/karaoke'
+import { SignupCodes } from './components/signup-codes'
 import { Spooks } from './components/spooks'
 import { grantBadges } from './utils/badges'
 import { getDevAdminUser, getDevSession, isDevLoginEnabled } from './utils/dev-login'
@@ -18,7 +19,7 @@ type UserProfile = {
   badges: string[]
   is_admin: boolean
   click_count: number
-  signup_email_status: string | null
+  signup_code_id?: string | null
   deletion_pending_at?: string | null
 }
 
@@ -28,14 +29,6 @@ type ProfileDraft = {
   email: string
 }
 
-const signupStatusLabels: Record<string, string> = {
-  not_sent: 'Not sent',
-  pending: 'Pending',
-  sent: 'Sent',
-  failed: 'Failed',
-}
-
-const signupStatusOptions = Object.keys(signupStatusLabels)
 const emptyProfileDraft: ProfileDraft = { name: '', costume: '', email: '' }
 
 function App() {
@@ -54,7 +47,6 @@ function App() {
             badges: initialDevUser.badges,
             is_admin: initialDevUser.is_admin,
             click_count: initialDevUser.click_count,
-            signup_email_status: initialDevUser.signup_email_status,
           },
         ]
       : [],
@@ -157,8 +149,6 @@ function App() {
   const currentUser = users.find((user) => user.id === session?.user.id) ?? null
   const isCurrentUserAdmin = accountStatus === 'active' && Boolean(currentUser?.is_admin && !currentUser.deletion_pending_at)
   const hasAnyAdminUsers = users.some((user) => user.is_admin)
-  const pendingLogins = users.filter((user) => user.signup_email_status === 'pending' || user.signup_email_status === 'not_sent').length
-  const verificationLinksSent = users.filter((user) => user.signup_email_status === 'sent').length
 
 
   const handleSaveProfile = async (event: FormEvent<HTMLFormElement>) => {
@@ -358,25 +348,6 @@ function App() {
     setDismissedBadgeIds([])
   }
 
-  const handleUpdateSignupStatus = async (userId: string, nextStatus: string) => {
-    if (!isCurrentUserAdmin) {
-      return
-    }
-
-    const { error } = await supabase.from('users').update({ signup_email_status: nextStatus }).eq('id', userId)
-
-    if (error) {
-      console.error('Failed to update signup email status:', error)
-      return
-    }
-
-    setUsers((currentUsers) =>
-      currentUsers.map((user) =>
-        user.id === userId ? { ...user, signup_email_status: nextStatus } : user,
-      ),
-    )
-  }
-
   const handleDeleteUser = async (userId: string) => {
     if (!isCurrentUserAdmin || userId === session?.user.id) {
       return
@@ -559,7 +530,6 @@ function App() {
                 badges: devUser.badges,
                 is_admin: devUser.is_admin,
                 click_count: devUser.click_count,
-                signup_email_status: devUser.signup_email_status,
               },
             ])
             setView('clicker')
@@ -592,17 +562,6 @@ function App() {
             <p>You do not have admin access.</p>
           ) : (
             <>
-              <div className="stat-grid">
-                <div className="card">
-                  <div className="stat-label">Pending logins</div>
-                  <strong className="stat-value">{pendingLogins}</strong>
-                </div>
-                <div className="card">
-                  <div className="stat-label">Email verification links sent</div>
-                  <strong className="stat-value">{verificationLinksSent}</strong>
-                </div>
-              </div>
-
               <div className="card">
                 <div className="row row--between">
                   <h3 style={{ margin: 0 }}>Badges</h3>
@@ -613,20 +572,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="card">
-                <h3 style={{ marginTop: 0 }}>Signup tracking</h3>
-                <ul className="list">
-                  {users.map((user) => (
-                    <li key={user.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
-                      <div className="row row--between">
-                        <strong>{user.name}</strong>
-                        <span className="muted" style={{ fontSize: '0.8rem' }}>{signupStatusLabels[user.signup_email_status ?? 'not_sent']}</span>
-                      </div>
-                      <div className="muted">{user.email}</div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <SignupCodes />
             </>
           )}
         </section>
@@ -655,7 +601,6 @@ function App() {
             <ul className="list">
               {users.map((user) => {
                 const showAllDetails = isCurrentUserAdmin
-                const signupStatus = user.signup_email_status ?? 'not_sent'
 
                 return (
                   <li
@@ -708,21 +653,6 @@ function App() {
                             onChange={() => handleToggleAdmin(user.id, user.is_admin)}
                           />
                         </div>
-
-                        <label className="stack" style={{ gap: '0.35rem' }}>
-                          <span style={{ fontWeight: 600 }}>Signup email status</span>
-                          <select
-                            value={signupStatus}
-                            disabled={Boolean(user.deletion_pending_at) || deletingUserId !== null}
-                            onChange={(event) => handleUpdateSignupStatus(user.id, event.target.value)}
-                          >
-                            {signupStatusOptions.map((option) => (
-                              <option key={option} value={option}>
-                                {signupStatusLabels[option]}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
 
                         {user.id !== session.user.id && (
                           <button type="button" disabled={deletingUserId !== null} onClick={() => handleDeleteUser(user.id)}>
@@ -781,12 +711,6 @@ function App() {
               Profile picture
             </label>
             <input id="profile-avatar" type="file" accept="image/*" onChange={handleAvatarUpload} />
-
-            {currentUser && (
-              <p>
-                <strong>Signup email status:</strong> {signupStatusLabels[currentUser.signup_email_status ?? 'not_sent']}
-              </p>
-            )}
 
             <form onSubmit={handleSaveProfile} className="stack">
               <label htmlFor="profile-name">

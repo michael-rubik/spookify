@@ -1,3 +1,13 @@
+create table if not exists public.signup_codes (
+  id uuid primary key default gen_random_uuid(),
+  code text not null check (btrim(code) <> ''),
+  seats integer not null check (seats > 0),
+  seats_used integer not null default 0 check (seats_used >= 0),
+  created_at timestamptz not null default now(),
+  constraint signup_codes_seats_not_exceeded check (seats_used <= seats)
+);
+create unique index if not exists signup_codes_code_key on public.signup_codes (lower(code));
+
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null,
@@ -7,7 +17,7 @@ create table if not exists public.users (
   badges text[] not null default '{}',
   is_admin boolean not null default false,
   click_count integer not null default 0,
-  signup_email_status text not null default 'not_sent' check (signup_email_status in ('not_sent', 'pending', 'sent', 'failed')),
+  signup_code_id uuid references public.signup_codes(id) on delete set null,
   deletion_pending_at timestamptz,
   created_at timestamptz not null default now()
 );
@@ -61,8 +71,20 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  claimed_code_id uuid;
 begin
-  insert into public.users (id, name, costume, email, avatar_url, badges, is_admin, click_count, signup_email_status)
+  update public.signup_codes
+    set seats_used = seats_used + 1
+    where lower(code) = lower(btrim(coalesce(new.raw_user_meta_data ->> 'signup_code', '')))
+      and seats_used < seats
+    returning id into claimed_code_id;
+
+  if claimed_code_id is null then
+    raise exception 'Invalid or exhausted signup code';
+  end if;
+
+  insert into public.users (id, name, costume, email, avatar_url, badges, is_admin, click_count, signup_code_id)
   values (
     new.id,
     coalesce(new.raw_user_meta_data ->> 'name', ''),
@@ -72,7 +94,7 @@ begin
     '{}'::text[],
     false,
     0,
-    'not_sent'
+    claimed_code_id
   )
   on conflict (id) do update
     set name = excluded.name,
@@ -82,7 +104,7 @@ begin
         badges = coalesce(excluded.badges, public.users.badges, '{}'::text[]),
         is_admin = coalesce(public.users.is_admin, false),
         click_count = coalesce(public.users.click_count, 0),
-        signup_email_status = coalesce(public.users.signup_email_status, 'not_sent');
+        signup_code_id = coalesce(public.users.signup_code_id, excluded.signup_code_id);
 
   return new;
 end;
@@ -595,3 +617,47 @@ language sql security invoker set search_path = ''
 as $$ select * from private.account_deletion_files(target_id, batch_size) $$;
 revoke all on function private.account_deletion_files(uuid, integer), public.account_deletion_files(uuid, integer) from public, anon, authenticated;
 grant execute on function private.account_deletion_files(uuid, integer), public.account_deletion_files(uuid, integer) to service_role;
+
+create or replace function private.guard_signup_codes()
+returns trigger language plpgsql security definer set search_path = ''
+as $$
+begin
+  new.code := btrim(new.code);
+  if current_setting('role', true) in ('authenticated', 'anon') then
+    if tg_op = 'INSERT' then
+      new.seats_used := 0;
+    elsif new.id is distinct from old.id
+      or new.code is distinct from old.code
+      or new.seats_used is distinct from old.seats_used then
+      raise exception 'Only the seat count of a signup code can be changed' using errcode = '42501';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function private.guard_signup_codes() from public, anon, authenticated;
+create or replace trigger guard_signup_codes before insert or update on public.signup_codes
+for each row execute function private.guard_signup_codes();
+
+alter table public.signup_codes enable row level security;
+
+drop policy if exists "Active admins can read signup codes" on public.signup_codes;
+create policy "Active admins can read signup codes"
+on public.signup_codes for select to authenticated
+using (public.account_is_active_admin());
+
+drop policy if exists "Active admins can add signup codes" on public.signup_codes;
+create policy "Active admins can add signup codes"
+on public.signup_codes for insert to authenticated
+with check (public.account_is_active_admin());
+
+drop policy if exists "Active admins can change signup code seats" on public.signup_codes;
+create policy "Active admins can change signup code seats"
+on public.signup_codes for update to authenticated
+using (public.account_is_active_admin())
+with check (public.account_is_active_admin());
+
+drop policy if exists "Active admins can remove signup codes" on public.signup_codes;
+create policy "Active admins can remove signup codes"
+on public.signup_codes for delete to authenticated
+using (public.account_is_active_admin());
