@@ -4,3 +4,7 @@ enable_confirmations = false
 [functions.delete-account]
 verify_jwt = true
 import_map = "./functions/deno.json"
+
+[functions.spookify-search]
+verify_jwt = true
+import_map = "./functions/deno.json"

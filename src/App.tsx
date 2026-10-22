@@ -8,8 +8,10 @@ import { Karaoke } from './components/karaoke'
 import { Poll } from './components/poll'
 import { SignupCodes } from './components/signup-codes'
 import { Spooks } from './components/spooks'
+import { Spookify } from './components/spookify'
 import { VotesAdmin } from './components/votes-admin'
 import { grantBadges } from './utils/badges'
+import { formatSpookifyScore } from './utils/spookify'
 import { getDevAdminUser, getDevSession, isDevLoginEnabled } from './utils/dev-login'
 
 type UserProfile = {
@@ -21,6 +23,7 @@ type UserProfile = {
   badges: string[]
   is_admin: boolean
   click_count: number
+  spookify_score?: number | string | null
   signup_code_id?: string | null
   deletion_pending_at?: string | null
 }
@@ -54,7 +57,7 @@ function App() {
       : [],
   )
   const [loadingUsers, setLoadingUsers] = useState(false)
-  const [view, setView] = useState<'clicker' | 'profile' | 'users' | 'spooks' | 'karaoke' | 'poll' | 'admin'>('clicker')
+  const [view, setView] = useState<'clicker' | 'profile' | 'users' | 'spooks' | 'karaoke' | 'poll' | 'spookify' | 'admin'>('clicker')
   const [hasVotes, setHasVotes] = useState(false)
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>(emptyProfileDraft)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
@@ -470,6 +473,7 @@ function App() {
     { key: 'clicker', label: 'Clicker', icon: '👻' },
     { key: 'spooks', label: 'Spooks', icon: '🎃' },
     { key: 'karaoke', label: 'Karaoke', icon: '🎤' },
+    ...(isDevLoginEnabled() ? [] : [{ key: 'spookify' as const, label: 'Spookify', icon: '🎧' }]),
     ...(hasVotes ? [{ key: 'poll' as const, label: 'Poll', icon: '🗳️' }] : []),
     { key: 'users', label: 'Users', icon: '🧟' },
     { key: 'profile', label: 'Profile', icon: '🎭' },
@@ -519,6 +523,15 @@ function App() {
             >
               Karaoke
             </button>
+            {!isDevLoginEnabled() && (
+              <button
+                type="button"
+                className={`nav-button${view === 'spookify' ? ' is-active' : ''}`}
+                onClick={() => setView('spookify')}
+              >
+                Spookify
+              </button>
+            )}
             {hasVotes && (
               <button
                 type="button"
@@ -710,6 +723,8 @@ function App() {
         <Karaoke currentUserId={session.user.id} isCurrentUserAdmin={isCurrentUserAdmin} />
       ) : view === 'poll' ? (
         <Poll currentUserId={session.user.id} users={users} />
+      ) : view === 'spookify' ? (
+        <Spookify currentUserId={session.user.id} />
       ) : (
         <section className="page-section">
           <h2>Profile</h2>
@@ -729,6 +744,9 @@ function App() {
             </p>
             <p>
               <strong>Click count:</strong> {currentUser?.click_count ?? 0}
+            </p>
+            <p>
+              <strong>Spookify score:</strong> {formatSpookifyScore(currentUser?.spookify_score)}
             </p>
             <p>
               <strong>Badges:</strong> {currentUser?.badges?.length ? currentUser.badges.join(', ') : 'None'}

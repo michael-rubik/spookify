@@ -1,0 +1,133 @@
+.spookify-section {
+  display: grid;
+  gap: 1rem;
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.spookify-tabs {
+  gap: 0.5rem;
+}
+
+.spookify-search {
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.spookify-search input {
+  flex: 1;
+  min-width: 0;
+}
+
+.spookify-results {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spookify-result {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.spookify-result-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.spookify-result-text strong,
+.spookify-result-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spookify-result-text small {
+  color: var(--muted);
+}
+
+.spookify-art {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex: none;
+}
+
+.spookify-art--fallback {
+  display: grid;
+  place-items: center;
+  background: rgba(127, 127, 127, 0.2);
+  font-size: 1.4rem;
+}
+
+.spookify-tinder {
+  justify-items: center;
+}
+
+.spookify-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  text-align: center;
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+}
+
+.spookify-card:active {
+  cursor: grabbing;
+}
+
+.spookify-card .spookify-art {
+  width: 160px;
+  height: 160px;
+}
+
+.spookify-card small {
+  color: var(--muted);
+}
+
+.spookify-swipe-actions {
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.spookify-swipe-actions button {
+  flex: 1;
+}
+
+@media (min-width: 768px) {
+  .spookify-card {
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  .spookify-swipe-actions {
+    max-width: 420px;
+    margin: 0 auto;
+  }
+}

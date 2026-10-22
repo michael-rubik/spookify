@@ -30,5 +30,17 @@ _Avoid_: Poll (for the event), election
 **Winner badge** — "Gewinner von `<category>`", shown to each winner of an ended vote. It exists only while its vote exists.
 
 **Deletion pending** — Marker (`users.deletion_pending_at`) on an account whose permanent deletion has started. The account is blocked from writes and sign-in until deletion finishes. If cleanup fails, it stays pending as the retry target.
-
 **Permanent account deletion** — Admin-only removal of another user: the account is marked pending, their avatar and spook images are removed from Storage, then the Auth account and profile are deleted. Their spooks and karaoke songs are removed, and their tags are removed from other authors' spooks. The same email may later register as a fresh, non-admin user with no restored data.
+
+**Spookify Source** — The place where a user searches Spotify by title or artist and adds a song to the pool.
+
+**Pool** — The shared set of songs added through Spookify Source. A song is in the pool once; whoever added it first stays its submitter.
+
+**Submitter** — The user who added a song to the pool.
+
+**Spookify Tinder** — The place where a user is shown a random pool song and swipes on it. A user never meets their own songs.
+
+**Swipe** — One user's verdict on one pool song. Swiping right means they like the song, swiping left means they do not. Each user swipes a given song once, and the swipe cannot be changed. Unrelated to a ballot: a swipe is attributed to its swiper, never anonymous.
+
+**Spookify score** — A user's reward total from Spookify. Adding a song is worth half a point, swiping left half a point, and swiping right a full point; each right swipe is also worth a full point to the song's submitter. Separate from the click count, and it earns no badges.
+

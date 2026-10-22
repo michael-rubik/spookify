@@ -72,8 +72,24 @@ what was chosen (`vote_tallies`) live in separate tables with no link and no
 timestamps, and tallies are readable only after the vote ends. See
 `docs/adr/0001-anonymous-ballots.md`.
 
-## End-to-end tests
+## Spookify
 
+Apply `20261029_add_spookify.sql` before deploying the Spookify view. Songs
+(`spookify_songs`) and swipes (`spookify_swipes`) are written only by the
+`add_spookify_song` and `swipe_spookify_song` definer functions, which also award
+`users.spookify_score`; clients hold no write grants, and a profile trigger rejects
+any score change that those functions did not make. A track can enter the pool once,
+so a repeat submission raises `Song already added` and pays nobody. A user swipes a
+given song at most once and never sees their own songs, which `next_spookify_song`
+enforces while picking a random unswiped song. Unlike votes, swipes are attributed
+to the swiper, but each user can read only their own.
+
+Searching Spotify goes through the `spookify-search` Edge Function so the Spotify
+client secret stays on the server; it uses the Client Credentials flow, which reaches
+the public catalogue only. The app links out to Spotify instead of playing audio, so
+no guest needs a Spotify account.
+
+## End-to-end tests
 `npm run test:e2e` runs Playwright against a throwaway Postgres + PostgREST in a
 podman pod (`podman machine start` first), never the hosted project. The voting
 story uses one admin and four member browser contexts, and the teardown asserts
