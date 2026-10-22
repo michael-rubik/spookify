@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ChangeEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './utils/supabase/supabase-client'
@@ -101,23 +101,31 @@ function App() {
 
   const pollingEnabled = !!session && !isDevLoginEnabled()
 
+  const hasLoadedUsers = useRef(false)
+  const sessionUserId = session?.user.id
+  useEffect(() => {
+    hasLoadedUsers.current = false
+  }, [sessionUserId])
+
   usePolling(
     async (isCancelled) => {
       if (!session) return
-      setLoadingUsers(true)
+      // Only the first load shows a loading state; background refetches swap values in silently.
+      if (!hasLoadedUsers.current) setLoadingUsers(true)
 
       const { data, error } = await supabase.from('users').select('*').order('name', { ascending: true })
       if (isCancelled()) return
 
       if (error) {
         console.error('Failed to load users:', error)
-        setAccountStatus('error')
+        if (!hasLoadedUsers.current) setAccountStatus('error')
         setLoadingUsers(false)
         return
       }
 
       const profiles = (data ?? []) as UserProfile[]
       const ownProfile = profiles.find((user) => user.id === session.user.id)
+      hasLoadedUsers.current = true
       setAccountStatus(!ownProfile ? 'missing' : ownProfile.deletion_pending_at ? 'pending' : 'active')
       setUsers(profiles)
       setLoadingUsers(false)

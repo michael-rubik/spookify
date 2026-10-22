@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   describeSpookifyError,
+  fmkAssignmentComplete,
+  fmkSubmitterReward,
+  fmkTierPoints,
+  FMK_PLAYER_REWARD,
   formatSpookifyScore,
   markAlreadyAdded,
   submitterReward,
   swiperReward,
-  SUBMISSION_REWARD,
   type SpookifyTrack,
 } from './spookify'
 import {
@@ -25,15 +28,40 @@ const track = (id: string): SpookifyTrack => ({
 })
 
 describe('spookify rewards', () => {
-  it('pays half a point for adding, a full point for a right swipe and half for a left swipe', () => {
-    expect(SUBMISSION_REWARD).toBe(0.5)
+  it('pays the swiper a point for a right swipe and half for a left swipe', () => {
     expect(swiperReward('right')).toBe(1)
     expect(swiperReward('left')).toBe(0.5)
   })
 
-  it('pays the submitter only when someone swipes right', () => {
-    expect(submitterReward('right')).toBe(1)
-    expect(submitterReward('left')).toBe(0)
+  it('pays the submitter half a point per left swipe and nothing for a right swipe', () => {
+    expect(submitterReward('right')).toBe(0)
+    expect(submitterReward('left')).toBe(0.5)
+  })
+})
+
+describe('fmk', () => {
+  it('pays the player a flat point and the submitter one for sing and a half for listen', () => {
+    expect(FMK_PLAYER_REWARD).toBe(1)
+    expect(fmkSubmitterReward('sing')).toBe(1)
+    expect(fmkSubmitterReward('listen')).toBe(0.5)
+    expect(fmkSubmitterReward('delete')).toBe(0)
+  })
+
+  it('moves songs up two tiers for sing and one for listen', () => {
+    expect(fmkTierPoints('sing')).toBe(2)
+    expect(fmkTierPoints('listen')).toBe(1)
+    expect(fmkTierPoints('delete')).toBe(0)
+  })
+
+  it('is complete only when each song has its own distinct choice', () => {
+    const ids = ['a', 'b', 'c']
+    expect(fmkAssignmentComplete(ids, { a: 'sing', b: 'listen', c: 'delete' })).toBe(true)
+    expect(fmkAssignmentComplete(ids, { a: 'sing', b: 'listen' })).toBe(false)
+    expect(fmkAssignmentComplete(ids, { a: 'sing', b: 'sing', c: 'delete' })).toBe(false)
+  })
+
+  it('explains an own-song choice as an FMK error, not a swipe error', () => {
+    expect(describeSpookifyError({ message: 'You cannot choose your own song' })).toBe('You cannot choose your own song.')
   })
 })
 

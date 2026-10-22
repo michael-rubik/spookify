@@ -1,0 +1,113 @@
+.leaderboard {
+  display: grid;
+  gap: 0.6rem;
+  width: 100%;
+  max-width: 560px;
+  margin: 1.5rem auto 0;
+  text-align: left;
+}
+
+.leaderboard h3 {
+  margin: 0;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.game-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid rgba(139, 92, 246, 0.6);
+  border-radius: 10px;
+  background: rgba(139, 92, 246, 0.12);
+  text-align: left;
+}
+
+.game-note p {
+  flex: 1;
+  margin: 0;
+}
+
+.game-note-dismiss {
+  padding: 0 0.4rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.leaderboard-rows {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.leaderboard-row {
+  position: relative;
+  min-height: 44px;
+  overflow: hidden;
+  border: 1px solid rgba(127, 127, 127, 0.4);
+  border-radius: 10px;
+  background: rgba(127, 127, 127, 0.12);
+}
+
+.leaderboard-row.is-own {
+  border-color: #8b5cf6;
+}
+
+.leaderboard-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(139, 92, 246, 0.45);
+  transition: width 0.8s ease;
+}
+
+.leaderboard-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding: 0 0.8rem;
+}
+
+.leaderboard-rank {
+  min-width: 1.5rem;
+  font-weight: 700;
+}
+
+.leaderboard-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.leaderboard-text strong,
+.leaderboard-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboard-count {
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .leaderboard-fill {
+    transition: none;
+  }
+}

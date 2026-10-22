@@ -3,21 +3,30 @@ import type { FormEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { supabase } from '../utils/supabase/supabase-client'
 import {
   describeSpookifyError,
+  fmkAssignmentComplete,
+  FMK_CHOICES,
   formatSpookifyScore,
   markAlreadyAdded,
   SONG_ALREADY_ADDED_MESSAGE,
+  type FmkChoice,
+  type FmkSong,
   type SearchResult,
   type SpookifySong,
   type SpookifyTrack,
   type SwipeDirection,
 } from '../utils/spookify'
 import './spookify.css'
+import './leaderboard.css'
+import { GameNote } from './game-note'
+import { Leaderboard } from './leaderboard'
 
 type SpookifyProps = {
   currentUserId: string
 }
 
 const SWIPE_THRESHOLD = 80
+
+const FMK_LABELS: Record<FmkChoice, string> = { sing: '🎤 Sing', listen: '🎧 Listen', delete: '🗑️ Delete' }
 
 function Artwork({ track }: { track: SpookifyTrack }) {
   return track.album_art_url ? (
@@ -30,7 +39,7 @@ function Artwork({ track }: { track: SpookifyTrack }) {
 }
 
 export function Spookify({ currentUserId }: SpookifyProps) {
-  const [panel, setPanel] = useState<'source' | 'tinder'>('source')
+  const [panel, setPanel] = useState<'source' | 'tinder' | 'fmk'>('source')
   const [score, setScore] = useState<number | string | null>(null)
 
   const [query, setQuery] = useState('')
@@ -47,8 +56,40 @@ export function Spookify({ currentUserId }: SpookifyProps) {
   const [isSwiping, setIsSwiping] = useState(false)
   const [drag, setDrag] = useState(0)
 
+  const [fmkSongs, setFmkSongs] = useState<FmkSong[]>([])
+  const [maxTier, setMaxTier] = useState(0)
+  const [assignment, setAssignment] = useState<Record<string, FmkChoice | undefined>>({})
+  const [isLoadingFmk, setIsLoadingFmk] = useState(true)
+  const [isSubmittingFmk, setIsSubmittingFmk] = useState(false)
+  const [fmkError, setFmkError] = useState('')
+
   const reloadRef = useRef<() => Promise<void>>(async () => {})
+  const reloadFmkRef = useRef<() => Promise<void>>(async () => {})
   const dragStart = useRef<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadFmk = async () => {
+      const [round, max] = await Promise.all([
+        supabase.rpc('next_spookify_fmk'),
+        supabase.rpc('spookify_fmk_max_tier'),
+      ])
+      if (cancelled) return
+
+      setFmkError(round.error ? describeSpookifyError(round.error) : '')
+      setFmkSongs(round.error ? [] : ((round.data ?? []) as FmkSong[]))
+      setAssignment({})
+      setMaxTier(typeof max.data === 'number' ? max.data : 0)
+      setIsLoadingFmk(false)
+    }
+
+    reloadFmkRef.current = loadFmk
+    void loadFmk()
+    return () => {
+      cancelled = true
+    }
+  }, [currentUserId])
 
   useEffect(() => {
     let cancelled = false
@@ -132,7 +173,7 @@ export function Spookify({ currentUserId }: SpookifyProps) {
     }
 
     markPooled(track.spotify_track_id)
-    setSourceMessage(`Added "${track.title}" to the pool. +0.5 Spookify score.`)
+    setSourceMessage(`Added "${track.title}" to the pool.`)
     await reloadRef.current()
   }
 
@@ -148,6 +189,37 @@ export function Spookify({ currentUserId }: SpookifyProps) {
       setTinderError(describeSpookifyError(error))
     }
     await reloadRef.current()
+  }
+
+  const handleChoose = (songId: string, choice: FmkChoice) => {
+    setAssignment((current) => {
+      const next: Record<string, FmkChoice | undefined> = {}
+      // Each choice belongs to one song, so picking it elsewhere moves it.
+      for (const [id, picked] of Object.entries(current)) {
+        if (picked !== choice && id !== songId) next[id] = picked
+      }
+      next[songId] = choice
+      return next
+    })
+  }
+
+  const handleSubmitFmk = async () => {
+    const bySong = (choice: FmkChoice) => fmkSongs.find((song) => assignment[song.id] === choice)?.id
+    const [sing, listen, remove] = FMK_CHOICES.map(bySong)
+    if (!sing || !listen || !remove || isSubmittingFmk) return
+
+    setIsSubmittingFmk(true)
+    setFmkError('')
+    const { error } = await supabase.rpc('submit_spookify_fmk', { p_sing: sing, p_listen: listen, p_delete: remove })
+    setIsSubmittingFmk(false)
+
+    if (error) {
+      const message = describeSpookifyError(error)
+      await reloadFmkRef.current()
+      setFmkError(message)
+      return
+    }
+    await Promise.all([reloadFmkRef.current(), reloadRef.current()])
   }
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -186,20 +258,35 @@ export function Spookify({ currentUserId }: SpookifyProps) {
           className={`nav-button${panel === 'source' ? ' is-active' : ''}`}
           onClick={() => setPanel('source')}
         >
-          Source
+          Add song to game
         </button>
         <button
           type="button"
           className={`nav-button${panel === 'tinder' ? ' is-active' : ''}`}
           onClick={() => setPanel('tinder')}
         >
-          Tinder
+          Spookify Tinder
+        </button>
+        <button
+          type="button"
+          className={`nav-button${panel === 'fmk' ? ' is-active' : ''}`}
+          onClick={() => {
+            setPanel('fmk')
+            // Songs may have been added since the round was dealt; keep a round the user has started.
+            if (Object.keys(assignment).length === 0) void reloadFmkRef.current()
+          }}
+        >
+          Spookify FMK
         </button>
       </div>
 
       {panel === 'source' ? (
         <div className="card stack">
-          <p className="muted">Search Spotify and add songs to the pool. Every added song is worth +0.5.</p>
+          <GameNote gameId="source">
+            Adding a song pays nothing. You earn points when others play your songs: +0.5 per left swipe in Tinder,
+            +1 each time a song is sung and +0.5 each time it is listened to in FMK.
+          </GameNote>
+          <p className="muted">Search Spotify and add songs to the pool.</p>
 
           <form onSubmit={handleSearch} className="row spookify-search">
             <label className="sr-only" htmlFor="spookify-query">
@@ -245,10 +332,14 @@ export function Spookify({ currentUserId }: SpookifyProps) {
               </li>
             ))}
           </ul>
+          <Leaderboard userId={currentUserId} column="submitter_score" label="Add song to game" />
         </div>
-      ) : (
+      ) : panel === 'tinder' ? (
         <div className="card stack spookify-tinder">
-          <p className="muted">Swipe right if you like the song (+1), left if you do not (+0.5). One swipe per song.</p>
+          <GameNote gameId="tinder">
+            Swipe right for +1 and left for +0.5. When you swipe left, the person who added the song also earns +0.5.
+          </GameNote>
+          <p className="muted">Swipe right if you like the song, left if you do not. One swipe per song.</p>
 
           {tinderError && <p role="alert" className="form-error">{tinderError}</p>}
 
@@ -256,7 +347,7 @@ export function Spookify({ currentUserId }: SpookifyProps) {
             <p className="muted">Loading a song...</p>
           ) : !song ? (
             <p className="muted" data-testid="spookify-empty">
-              No songs left to swipe. Add more in Source.
+              No songs left to swipe. Add more in Add song to game.
             </p>
           ) : (
             <>
@@ -289,6 +380,72 @@ export function Spookify({ currentUserId }: SpookifyProps) {
               </div>
             </>
           )}
+          <Leaderboard userId={currentUserId} column="tinder_score" label="Spookify Tinder" />
+        </div>
+      ) : (
+        <div className="card stack spookify-fmk">
+          <GameNote gameId="fmk">
+            Every round you play earns +1. The person who added the song you sing earns +1, and the one you listen to
+            earns +0.5.
+          </GameNote>
+          <p className="muted">
+            Give each song a different choice: sing, listen or delete. Sing and listen move a song up a tier; delete
+            removes it from your rounds.
+          </p>
+          <p className="row spookify-fmk-tiers" data-testid="spookify-fmk-tiers">
+            <span className="pill">Current tier {fmkSongs[0]?.tier ?? '–'}</span>
+            <span className="pill">Max tier {maxTier}</span>
+          </p>
+
+          {fmkError && <p role="alert" className="form-error">{fmkError}</p>}
+
+          {isLoadingFmk ? (
+            <p className="muted">Loading songs...</p>
+          ) : fmkSongs.length < FMK_CHOICES.length ? (
+            <p className="muted" data-testid="spookify-fmk-empty">
+              No new matchups. Add more songs in{' '}
+              <button type="button" className="link-button" onClick={() => setPanel('source')}>
+                Add song to game
+              </button>
+              .
+            </p>
+          ) : (
+            <>
+              <ul className="spookify-results">
+                {fmkSongs.map((fmkSong) => (
+                  <li key={fmkSong.id} className="spookify-result spookify-fmk-song" data-testid="spookify-fmk-song">
+                    <Artwork track={fmkSong} />
+                    <span className="spookify-result-text">
+                      <strong>{fmkSong.title}</strong>
+                      <small>{fmkSong.artist}</small>
+                    </span>
+                    <span className="row spookify-fmk-choices" role="group" aria-label={`Choice for ${fmkSong.title}`}>
+                      {FMK_CHOICES.map((choice) => (
+                        <button
+                          key={choice}
+                          type="button"
+                          className={assignment[fmkSong.id] === choice ? 'is-selected' : undefined}
+                          aria-pressed={assignment[fmkSong.id] === choice}
+                          disabled={isSubmittingFmk}
+                          onClick={() => handleChoose(fmkSong.id, choice)}
+                        >
+                          {FMK_LABELS[choice]}
+                        </button>
+                      ))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                disabled={isSubmittingFmk || !fmkAssignmentComplete(fmkSongs.map((fmkSong) => fmkSong.id), assignment)}
+                onClick={() => void handleSubmitFmk()}
+              >
+                {isSubmittingFmk ? 'Saving...' : 'Lock in'}
+              </button>
+            </>
+          )}
+          <Leaderboard userId={currentUserId} column="fmk_score" label="Spookify FMK" />
         </div>
       )}
     </section>

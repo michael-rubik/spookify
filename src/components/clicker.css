@@ -1,0 +1,28 @@
+.clicker-arena {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin: 0.5rem 0;
+}
+
+.clicker-arena.is-jumping {
+  display: block;
+  height: 16rem;
+  border: 1px dashed rgba(127, 127, 127, 0.4);
+  border-radius: 12px;
+}
+
+.clicker-arena.is-jumping .clicker-button {
+  position: absolute;
+  width: 8rem;
+  height: 3rem;
+  padding: 0;
+  transition: left 0.2s ease, top 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clicker-arena.is-jumping .clicker-button {
+    transition: none;
+  }
+}

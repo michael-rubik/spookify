@@ -84,6 +84,21 @@ given song at most once and never sees their own songs, which `next_spookify_son
 enforces while picking a random unswiped song. Unlike votes, swipes are attributed
 to the swiper, but each user can read only their own.
 
+Apply `20261030_add_spookify_fmk.sql` for Spookify FMK. A user's tier per song lives in
+`spookify_fmk_tiers` (points from sing and listen, plus a deleted flag) and the songs that
+already shared a round in `spookify_fmk_pairs`; both are readable only by their owner and
+written only by `submit_spookify_fmk`, which re-checks that the three songs share a tier,
+have never met, are not the caller's own, and then awards the round's points.
+`next_spookify_fmk` deals a random trio from the lowest tier that still has one.
+
+Apply `20261031_spookify_game_scores.sql` for per-game scores. `users` keeps three
+server-written columns, `submitter_score` (Add song to game), `tinder_score` and
+`fmk_score`, and `spookify_score` is their sum (the number the badge uses). Adding a song
+pays nothing. A right swipe pays the swiper 1 and a left swipe 0.5, plus 0.5 to the
+submitter. An FMK round pays the player 1, the submitter of the sung song 1 and the
+submitter of the listened song 0.5. The migration rebuilds existing scores from swipe
+history; old add-song points are dropped and FMK scores start at 0.
+
 Searching Spotify goes through the `spookify-search` Edge Function so the Spotify
 client secret stays on the server; it uses the Client Credentials flow, which reaches
 the public catalogue only. The app links out to Spotify instead of playing audio, so

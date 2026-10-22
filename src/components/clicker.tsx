@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { getUnlockedBadges, grantBadges } from '../utils/badges'
 import { supabase } from '../utils/supabase/supabase-client'
+import { Leaderboard } from './leaderboard'
+import './clicker.css'
+
+// From this many clicks on, the button hops to a random spot on every click.
+const JUMP_AFTER_CLICKS = 250
 
 type WinnerBadge = { vote_id: string; category: string }
 
@@ -18,6 +23,7 @@ export const Clicker = ({ userId, clickCount, badges, dismissedBadgeIds, onProgr
   const [isUpdating, setIsUpdating] = useState(false)
   const [showAll, setShowAll] = useState(false)
   const [winnerBadges, setWinnerBadges] = useState<WinnerBadge[]>([])
+  const [spot, setSpot] = useState({ x: 0.5, y: 0.5 })
 
   useEffect(() => {
     let cancelled = false
@@ -52,6 +58,7 @@ export const Clicker = ({ userId, clickCount, badges, dismissedBadgeIds, onProgr
     const nextBadges = grantBadges(nextCount, badges)
 
     setCount(nextCount)
+    if (nextCount >= JUMP_AFTER_CLICKS) setSpot({ x: Math.random(), y: Math.random() })
     onProgress?.(nextCount, nextBadges)
     setIsUpdating(true)
 
@@ -71,14 +78,23 @@ export const Clicker = ({ userId, clickCount, badges, dismissedBadgeIds, onProgr
 
   const unlocked = getUnlockedBadges(badges)
   const banners = unlocked.filter((badge) => !dismissedBadgeIds.includes(badge.id))
+  const isJumping = count >= JUMP_AFTER_CLICKS
 
   return (
     <section className="clicker-section">
       <h2>Clicker</h2>
       <p className="clicker-count">{count}</p>
-      <button type="button" onClick={handleClick} disabled={isUpdating}>
-        {isUpdating ? 'Saving...' : 'Click me'}
-      </button>
+      <div className={`clicker-arena${isJumping ? ' is-jumping' : ''}`}>
+        <button
+          type="button"
+          className="clicker-button"
+          style={isJumping ? { left: `calc((100% - 8rem) * ${spot.x})`, top: `calc((100% - 3rem) * ${spot.y})` } : undefined}
+          onClick={handleClick}
+          disabled={isUpdating}
+        >
+          {isUpdating ? 'Saving...' : 'Click me'}
+        </button>
+      </div>
       {banners.map((badge) => (
         <div key={badge.id} className="row row--between form-success" role="status">
           <span>{badge.message}</span>
@@ -110,6 +126,7 @@ export const Clicker = ({ userId, clickCount, badges, dismissedBadgeIds, onProgr
           )}
         </>
       )}
+      <Leaderboard userId={userId} column="click_count" label="Click" ownValue={count} />
     </section>
   )
 }
