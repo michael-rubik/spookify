@@ -63,3 +63,5 @@ _Avoid_: Poll (for the event), election
 **Max tier** — The highest tier any of a user's songs has reached.
 
 **Leaderboard** — A bar graph ranking users, showing the top ten plus the viewer's own row. The clicker view ranks by click count; Add song to game, Spookify Tinder and Spookify FMK each rank by their own score.
+
+**Route** — The URL path of a view: `/admin`, `/clicker`, `/spooks`, `/karaoke`, `/poll`, `/users`, `/profile`, `/spookify/add`, `/spookify/tinder`, `/spookify/fmk`. Unknown paths go to `/clicker`. The host must serve `index.html` for unknown paths.

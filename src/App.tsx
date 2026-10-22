@@ -13,6 +13,8 @@ import { VotesAdmin } from './components/votes-admin'
 import { badgeDisplayName, CUSTOM_BADGE_MAX_LENGTH, giveCustomBadge, grantBadges } from './utils/badges'
 import { formatSpookifyScore } from './utils/spookify'
 import { usePolling } from './utils/use-polling'
+import { navigate, useRoute } from './utils/use-route'
+import { pathFor, type View } from './utils/routes'
 import { getDevAdminUser, getDevSession, isDevLoginEnabled } from './utils/dev-login'
 
 type UserProfile = {
@@ -58,7 +60,9 @@ function App() {
       : [],
   )
   const [loadingUsers, setLoadingUsers] = useState(false)
-  const [view, setView] = useState<'clicker' | 'profile' | 'users' | 'spooks' | 'karaoke' | 'poll' | 'spookify' | 'admin'>('clicker')
+  const route = useRoute()
+  const view = route.view
+  const setView = (nextView: View) => navigate(pathFor(nextView))
   const [hasVotes, setHasVotes] = useState(false)
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>(emptyProfileDraft)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
@@ -92,7 +96,6 @@ function App() {
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       setSession(currentSession)
-      setView(currentSession ? 'clicker' : 'clicker')
       if (!currentSession) {
         setUsers([])
       }
@@ -502,7 +505,7 @@ function App() {
     setDismissedBadgeIds((current) => (current.includes(badgeId) ? current : [...current, badgeId]))
   }
 
-  const navItems: { key: typeof view; label: string; icon: string }[] = [
+  const navItems: { key: View; label: string; icon: string }[] = [
     { key: 'clicker', label: 'Clicker', icon: '👻' },
     { key: 'spooks', label: 'Spooks', icon: '🎃' },
     { key: 'karaoke', label: 'Karaoke', icon: '🎤' },
@@ -815,7 +818,11 @@ function App() {
       ) : view === 'poll' ? (
         <Poll currentUserId={session.user.id} users={users} />
       ) : view === 'spookify' ? (
-        <Spookify currentUserId={session.user.id} />
+        <Spookify
+          currentUserId={session.user.id}
+          panel={route.panel}
+          onPanelChange={(panel) => navigate(pathFor('spookify', panel))}
+        />
       ) : (
         <section className="page-section">
           <h2>Profile</h2>

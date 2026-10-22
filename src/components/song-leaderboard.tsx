@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../utils/supabase/supabase-client'
 import { isDevLoginEnabled } from '../utils/dev-login'
 import {
@@ -24,13 +24,13 @@ type SongRecord = {
 const submitterName = (submitter: SongRecord['submitter']): string =>
   (Array.isArray(submitter) ? submitter[0]?.name : submitter?.name) ?? 'Unknown'
 
-export const SongLeaderboard = () => {
+export const SongLeaderboard = ({ refreshKey }: { refreshKey?: number }) => {
   const [songs, setSongs] = useState<LeaderboardSong[]>([])
   const [error, setError] = useState('')
   const [submitterId, setSubmitterId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
 
-  usePolling(
+  const reload = usePolling(
     async (isCancelled) => {
       const { data, error: loadError } = await supabase
         .from('spookify_songs')
@@ -60,6 +60,15 @@ export const SongLeaderboard = () => {
     10000,
     !isDevLoginEnabled(),
   )
+
+  const firstRender = useRef(true)
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false
+      return
+    }
+    void reload()
+  }, [refreshKey, reload])
 
   if (isDevLoginEnabled()) return null
 

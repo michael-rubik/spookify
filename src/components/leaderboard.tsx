@@ -3,7 +3,7 @@ import { isDevLoginEnabled } from '../utils/dev-login'
 import { buildLeaderboard, LEADERBOARD_LIMIT, type LeaderboardUser } from '../utils/leaderboard'
 import { formatSpookifyScore } from '../utils/spookify'
 import { usePolling } from '../utils/use-polling'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './leaderboard.css'
 
 type LeaderboardColumn = 'click_count' | 'submitter_score' | 'tinder_score' | 'fmk_score'
@@ -14,6 +14,8 @@ type LeaderboardProps = {
   label: string
   // Overrides the stored value for the viewer so a local count shows before the next fetch.
   ownValue?: number
+  // Changing this value triggers an immediate refetch.
+  refreshKey?: number
 }
 
 type LeaderboardRecord = {
@@ -23,12 +25,12 @@ type LeaderboardRecord = {
   avatar_url: string | null
 } & Record<string, unknown>
 
-export const Leaderboard = ({ userId, column, label, ownValue }: LeaderboardProps) => {
+export const Leaderboard = ({ userId, column, label, ownValue, refreshKey }: LeaderboardProps) => {
   const [users, setUsers] = useState<LeaderboardUser[]>([])
   const [error, setError] = useState('')
   const [expanded, setExpanded] = useState(false)
 
-  usePolling(
+  const reload = usePolling(
     async (isCancelled) => {
       const { data, error: loadError } = await supabase
         .from('users')
@@ -57,6 +59,15 @@ export const Leaderboard = ({ userId, column, label, ownValue }: LeaderboardProp
     10000,
     !isDevLoginEnabled(),
   )
+
+  const firstRender = useRef(true)
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false
+      return
+    }
+    void reload()
+  }, [refreshKey, reload])
 
   if (isDevLoginEnabled()) return null
 

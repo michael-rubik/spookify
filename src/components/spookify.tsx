@@ -15,6 +15,8 @@ import {
   type SpookifyTrack,
   type SwipeDirection,
 } from '../utils/spookify'
+import { usePolling } from '../utils/use-polling'
+import type { SpookifyPanel } from '../utils/routes'
 import './spookify.css'
 import './leaderboard.css'
 import { GameNote } from './game-note'
@@ -23,6 +25,8 @@ import { SongLeaderboard } from './song-leaderboard'
 
 type SpookifyProps = {
   currentUserId: string
+  panel: SpookifyPanel
+  onPanelChange: (panel: SpookifyPanel) => void
 }
 
 const SWIPE_THRESHOLD = 80
@@ -43,9 +47,23 @@ function Artwork({ track }: { track: SpookifyTrack }) {
   )
 }
 
-export function Spookify({ currentUserId }: SpookifyProps) {
-  const [panel, setPanel] = useState<'source' | 'tinder' | 'fmk'>('source')
+export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps) {
   const [score, setScore] = useState<number | string | null>(null)
+  // Bumped after the user's own plays so the leaderboards refetch at once instead of on the next poll.
+  const [scoreVersion, setScoreVersion] = useState(0)
+
+  const reloadScore = usePolling(
+    async (isCancelled) => {
+      const { data } = await supabase.from('users').select('spookify_score').eq('id', currentUserId).maybeSingle()
+      if (isCancelled() || !data) return
+      setScore(data.spookify_score ?? 0)
+    },
+    5000,
+  )
+  const refreshScores = () => {
+    void reloadScore()
+    setScoreVersion((version) => version + 1)
+  }
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
@@ -105,15 +123,13 @@ export function Spookify({ currentUserId }: SpookifyProps) {
 
     const load = async () => {
       setIsLoadingSong(true)
-      const [pool, next, profile] = await Promise.all([
+      const [pool, next] = await Promise.all([
         supabase.from('spookify_songs').select('spotify_track_id'),
         supabase.rpc('next_spookify_song'),
-        supabase.from('users').select('spookify_score').eq('id', currentUserId).maybeSingle(),
       ])
       if (cancelled) return
 
       setPooledTrackIds((pool.data ?? []).map((row) => row.spotify_track_id as string))
-      setScore(profile.data?.spookify_score ?? 0)
       setTinderError(next.error ? describeSpookifyError(next.error) : '')
       setSong(((next.data ?? []) as SpookifySong[])[0] ?? null)
       setIsLoadingSong(false)
@@ -202,6 +218,7 @@ export function Spookify({ currentUserId }: SpookifyProps) {
 
     markPooled(track.spotify_track_id)
     setSourceMessage(`Added "${track.title}" to the pool.`)
+    refreshScores()
     await reloadRef.current()
   }
 
@@ -216,6 +233,7 @@ export function Spookify({ currentUserId }: SpookifyProps) {
     if (error) {
       setTinderError(describeSpookifyError(error))
     }
+    refreshScores()
     await reloadRef.current()
   }
 
@@ -247,6 +265,7 @@ export function Spookify({ currentUserId }: SpookifyProps) {
       setFmkError(message)
       return
     }
+    refreshScores()
     await Promise.all([reloadFmkRef.current(), reloadRef.current()])
   }
 
@@ -284,14 +303,14 @@ export function Spookify({ currentUserId }: SpookifyProps) {
         <button
           type="button"
           className={`nav-button${panel === 'source' ? ' is-active' : ''}`}
-          onClick={() => setPanel('source')}
+          onClick={() => onPanelChange('source')}
         >
           Add song to game
         </button>
         <button
           type="button"
           className={`nav-button${panel === 'tinder' ? ' is-active' : ''}`}
-          onClick={() => setPanel('tinder')}
+          onClick={() => onPanelChange('tinder')}
         >
           Spookify Tinder
         </button>
@@ -299,7 +318,7 @@ export function Spookify({ currentUserId }: SpookifyProps) {
           type="button"
           className={`nav-button${panel === 'fmk' ? ' is-active' : ''}`}
           onClick={() => {
-            setPanel('fmk')
+            onPanelChange('fmk')
             // Songs may have been added since the round was dealt; keep a round the user has started.
             if (Object.keys(assignment).length === 0) void reloadFmkRef.current()
           }}
@@ -393,8 +412,8 @@ export function Spookify({ currentUserId }: SpookifyProps) {
               </button>
             </div>
           )}
-          <Leaderboard userId={currentUserId} column="submitter_score" label="Add song to game" />
-          <SongLeaderboard />
+          <Leaderboard userId={currentUserId} column="submitter_score" label="Add song to game" refreshKey={scoreVersion} />
+          <SongLeaderboard refreshKey={scoreVersion} />
         </div>
       ) : panel === 'tinder' ? (
         <div className="card stack spookify-tinder">
@@ -442,7 +461,7 @@ export function Spookify({ currentUserId }: SpookifyProps) {
               </div>
             </>
           )}
-          <Leaderboard userId={currentUserId} column="tinder_score" label="Spookify Tinder" />
+          <Leaderboard userId={currentUserId} column="tinder_score" label="Spookify Tinder" refreshKey={scoreVersion} />
         </div>
       ) : (
         <div className="card stack spookify-fmk">
@@ -466,7 +485,7 @@ export function Spookify({ currentUserId }: SpookifyProps) {
           ) : fmkSongs.length < FMK_CHOICES.length ? (
             <p className="muted" data-testid="spookify-fmk-empty">
               No new matchups. Add more songs in{' '}
-              <button type="button" className="link-button" onClick={() => setPanel('source')}>
+              <button type="button" className="link-button" onClick={() => onPanelChange('source')}>
                 Add song to game
               </button>
               .
@@ -507,7 +526,7 @@ export function Spookify({ currentUserId }: SpookifyProps) {
               </button>
             </>
           )}
-          <Leaderboard userId={currentUserId} column="fmk_score" label="Spookify FMK" />
+          <Leaderboard userId={currentUserId} column="fmk_score" label="Spookify FMK" refreshKey={scoreVersion} />
         </div>
       )}
     </section>
