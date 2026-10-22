@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getUnlockedBadges, grantBadges } from '../utils/badges'
+import { getCustomBadgeLabels, getUnlockedBadges, grantBadges } from '../utils/badges'
 import { supabase } from '../utils/supabase/supabase-client'
 import { Leaderboard } from './leaderboard'
 import './clicker.css'
@@ -77,6 +77,7 @@ export const Clicker = ({ userId, clickCount, badges, dismissedBadgeIds, onProgr
   }
 
   const unlocked = getUnlockedBadges(badges)
+  const customLabels = getCustomBadgeLabels(badges)
   const banners = unlocked.filter((badge) => !dismissedBadgeIds.includes(badge.id))
   const isJumping = count >= JUMP_AFTER_CLICKS
 
@@ -108,6 +109,15 @@ export const Clicker = ({ userId, clickCount, badges, dismissedBadgeIds, onProgr
           {winnerBadges.map((badge) => (
             <li key={badge.vote_id} data-testid="winner-badge">
               🏆 Gewinner von {badge.category}
+            </li>
+          ))}
+        </ul>
+      )}
+      {customLabels.length > 0 && (
+        <ul className="list" aria-label="Awarded badges">
+          {customLabels.map((label) => (
+            <li key={label} data-testid="custom-badge">
+              🎖️ {label}
             </li>
           ))}
         </ul>

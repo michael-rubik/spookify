@@ -29,6 +29,31 @@ export function grantBadges(clickCount: number, existingIds: readonly string[] |
   return Array.from(granted)
 }
 
+export const CUSTOM_BADGE_PREFIX = 'custom:'
+export const CUSTOM_BADGE_MAX_LENGTH = 40
+
+export const customBadgeId = (label: string): string => `${CUSTOM_BADGE_PREFIX}${label.trim()}`
+
+// Admin-given badges carry their own text; the prefix keeps them apart from built-in ids.
+export function getCustomBadgeLabels(ids: readonly string[] | null | undefined): string[] {
+  return cleanIds(ids)
+    .filter((id) => id.startsWith(CUSTOM_BADGE_PREFIX))
+    .map((id) => id.slice(CUSTOM_BADGE_PREFIX.length).trim())
+    .filter((label) => label.length > 0)
+}
+
+// Add-only and idempotent: giving the same text twice keeps a single badge.
+export function giveCustomBadge(label: string, existingIds: readonly string[] | null | undefined = []): string[] {
+  const text = label.trim()
+  const ids = cleanIds(existingIds)
+  if (!text) return ids
+  const id = customBadgeId(text)
+  return ids.includes(id) ? ids : [...ids, id]
+}
+
+export const badgeDisplayName = (id: string): string =>
+  id.startsWith(CUSTOM_BADGE_PREFIX) ? id.slice(CUSTOM_BADGE_PREFIX.length) : id
+
 // Pure lookup of unlocked badges in threshold order; unknown ids are ignored.
 export function getUnlockedBadges(ids: readonly string[] | null | undefined): BadgeDefinition[] {
   const unlocked = new Set(cleanIds(ids))

@@ -10,7 +10,7 @@ import { SignupCodes } from './components/signup-codes'
 import { Spooks } from './components/spooks'
 import { Spookify } from './components/spookify'
 import { VotesAdmin } from './components/votes-admin'
-import { grantBadges } from './utils/badges'
+import { badgeDisplayName, CUSTOM_BADGE_MAX_LENGTH, giveCustomBadge, grantBadges } from './utils/badges'
 import { formatSpookifyScore } from './utils/spookify'
 import { usePolling } from './utils/use-polling'
 import { getDevAdminUser, getDevSession, isDevLoginEnabled } from './utils/dev-login'
@@ -66,6 +66,10 @@ function App() {
   const [profileMessage, setProfileMessage] = useState('')
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [dismissedBadgeIds, setDismissedBadgeIds] = useState<string[]>([])
+  const [badgeLabel, setBadgeLabel] = useState('')
+  const [badgeRecipientIds, setBadgeRecipientIds] = useState<string[]>([])
+  const [isGivingBadge, setIsGivingBadge] = useState(false)
+  const [badgeFeedback, setBadgeFeedback] = useState('')
   const [deletionError, setDeletionError] = useState('')
   const [deletionMessage, setDeletionMessage] = useState('')
   const [accountStatus, setAccountStatus] = useState<'checking' | 'active' | 'pending' | 'missing' | 'error'>(
@@ -163,6 +167,7 @@ function App() {
 
   const currentUser = users.find((user) => user.id === session?.user.id) ?? null
   const isCurrentUserAdmin = accountStatus === 'active' && Boolean(currentUser?.is_admin && !currentUser.deletion_pending_at)
+  const activeUsers = users.filter((user) => !user.deletion_pending_at)
   const hasAnyAdminUsers = users.some((user) => user.is_admin)
 
 
@@ -332,6 +337,48 @@ function App() {
     )
 
     setUsers((current) => current.map((user) => updatedUsers.find((updated) => updated.id === user.id) ?? user))
+  }
+
+  const handleGiveBadge = async () => {
+    const label = badgeLabel.trim()
+    if (!isCurrentUserAdmin || !label || isGivingBadge) {
+      return
+    }
+
+    setIsGivingBadge(true)
+    setBadgeFeedback('')
+    const targets = users.filter((user) => !user.deletion_pending_at && badgeRecipientIds.includes(user.id))
+    const results = await Promise.all(
+      targets.map(async (user) => {
+        const badges = giveCustomBadge(label, user.badges)
+        const { error } = await supabase.from('users').update({ badges }).eq('id', user.id)
+
+        if (error) {
+          console.error('Failed to give badge to user:', user.id, error)
+          return null
+        }
+
+        return { id: user.id, badges }
+      }),
+    )
+    const given = results.filter((result): result is { id: string; badges: string[] } => result !== null)
+
+    setUsers((current) =>
+      current.map((user) => {
+        const updated = given.find((result) => result.id === user.id)
+        return updated ? { ...user, badges: updated.badges } : user
+      }),
+    )
+    setBadgeFeedback(
+      given.length === targets.length
+        ? `Gave "${label}" to ${given.length} user(s).`
+        : `Gave "${label}" to ${given.length} of ${targets.length} user(s); the rest failed.`,
+    )
+    if (given.length > 0) {
+      setBadgeLabel('')
+      setBadgeRecipientIds([])
+    }
+    setIsGivingBadge(false)
   }
 
   const handleResetBadges = async () => {
@@ -607,6 +654,64 @@ function App() {
                 </div>
               </div>
 
+              <div className="card stack">
+                <h3 style={{ margin: 0 }}>Give a badge</h3>
+                <form
+                  className="stack"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void handleGiveBadge()
+                  }}
+                >
+                  <label htmlFor="custom-badge-label">Badge text</label>
+                  <input
+                    id="custom-badge-label"
+                    type="text"
+                    value={badgeLabel}
+                    maxLength={CUSTOM_BADGE_MAX_LENGTH}
+                    onChange={(event) => setBadgeLabel(event.target.value)}
+                  />
+                  <fieldset className="stack">
+                    <legend>Users</legend>
+                    {activeUsers.map((user) => (
+                      <label key={user.id} className="row">
+                        <input
+                          type="checkbox"
+                          checked={badgeRecipientIds.includes(user.id)}
+                          onChange={() =>
+                            setBadgeRecipientIds((current) =>
+                              current.includes(user.id)
+                                ? current.filter((id) => id !== user.id)
+                                : [...current, user.id],
+                            )
+                          }
+                        />
+                        {user.name}
+                      </label>
+                    ))}
+                  </fieldset>
+                  <div className="row">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setBadgeRecipientIds(
+                          badgeRecipientIds.length === activeUsers.length ? [] : activeUsers.map((user) => user.id),
+                        )
+                      }
+                    >
+                      {badgeRecipientIds.length === activeUsers.length ? 'Select none' : 'Select all'}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isGivingBadge || !badgeLabel.trim() || badgeRecipientIds.length === 0}
+                    >
+                      {isGivingBadge ? 'Giving...' : `Give badge to ${badgeRecipientIds.length} user(s)`}
+                    </button>
+                  </div>
+                  {badgeFeedback && <p role="status">{badgeFeedback}</p>}
+                </form>
+              </div>
+
               <SignupCodes />
               <VotesAdmin />
             </>
@@ -674,7 +779,7 @@ function App() {
                         <div>{user.email}</div>
                         <div>Clicks: {user.click_count}</div>
                         <div>
-                          Badges: {user.badges?.length ? user.badges.join(', ') : 'None'}
+                          Badges: {user.badges?.length ? user.badges.map(badgeDisplayName).join(', ') : 'None'}
                         </div>
 
                         <div className="row row--between">

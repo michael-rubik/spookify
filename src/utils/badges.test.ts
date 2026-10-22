@@ -1,5 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import { BADGES, getUnlockedBadges, grantBadges } from './badges'
+import { BADGES, badgeDisplayName, getCustomBadgeLabels, getUnlockedBadges, giveCustomBadge, grantBadges } from './badges'
+
+describe('custom badges', () => {
+  it('adds a trimmed custom badge once and keeps existing badges', () => {
+    expect(giveCustomBadge('  Best Costume ', ['clicker'])).toEqual(['clicker', 'custom:Best Costume'])
+    expect(giveCustomBadge('Best Costume', ['custom:Best Costume'])).toEqual(['custom:Best Costume'])
+  })
+
+  it('ignores a blank label', () => {
+    expect(giveCustomBadge('   ', ['clicker'])).toEqual(['clicker'])
+  })
+
+  it('lists only custom badge labels and survives click grants', () => {
+    const ids = giveCustomBadge('Party MVP', ['clicker'])
+    expect(getCustomBadgeLabels(ids)).toEqual(['Party MVP'])
+    expect(grantBadges(0, ids)).toEqual(ids)
+    expect(getUnlockedBadges(ids).map((badge) => badge.id)).toEqual(['clicker'])
+    expect(badgeDisplayName('custom:Party MVP')).toBe('Party MVP')
+  })
+})
 
 describe('grantBadges', () => {
   it('awards the clicker badge at exactly 500 clicks', () => {
