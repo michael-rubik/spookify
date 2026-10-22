@@ -94,10 +94,11 @@ test('anonymous vote from start to winner badges to deletion', async ({ browser 
   await test.step('both winners get the badge, others do not', async () => {
     for (const page of [ann, ben]) {
       await page.reload()
+      await goTo(page, 'Clicker')
       await expect(page.getByTestId('winner-badge')).toContainText(`Gewinner von ${CATEGORY}`)
     }
     await cat.reload()
-    await expect(cat.getByRole('button', { name: 'Clicker', exact: true }).first()).toBeVisible()
+    await goTo(cat, 'Clicker')
     await expect(cat.getByTestId('winner-badge')).toHaveCount(0)
   })
 
@@ -107,6 +108,7 @@ test('anonymous vote from start to winner badges to deletion', async ({ browser 
     await expect(admin.getByRole('list', { name: 'Ended votes' })).toHaveCount(0)
     expect(voteTraces()).toBe(NO_TRACES)
     await ann.reload()
+    await goTo(ann, 'Clicker')
     await expect(ann.getByTestId('winner-badge')).toHaveCount(0)
   })
 })
