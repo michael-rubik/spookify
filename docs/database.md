@@ -90,6 +90,7 @@ the public catalogue only. The app links out to Spotify instead of playing audio
 no guest needs a Spotify account.
 
 ## End-to-end tests
+
 `npm run test:e2e` runs Playwright against a throwaway Postgres + PostgREST in a
 podman pod (`podman machine start` first), never the hosted project. The voting
 story uses one admin and four member browser contexts, and the teardown asserts

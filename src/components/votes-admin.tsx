@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { supabase } from '../utils/supabase/supabase-client'
+import { usePolling } from '../utils/use-polling'
 import { progressPercent, type VoteRecord } from '../utils/votes'
 
 type Progress = { voted: number; eligible: number }
@@ -12,42 +13,27 @@ export const VotesAdmin = () => {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [isBusy, setIsBusy] = useState(false)
-  const reloadRef = useRef<() => Promise<void>>(async () => {})
+  const reload = usePolling(async (isCancelled) => {
+    const { data, error: loadError } = await supabase
+      .from('votes')
+      .select('id, category, status, created_at, ended_at')
+      .order('created_at', { ascending: false })
+    if (isCancelled()) return
 
-  useEffect(() => {
-    let cancelled = false
-
-    const load = async () => {
-      const { data, error: loadError } = await supabase
-        .from('votes')
-        .select('id, category, status, created_at, ended_at')
-        .order('created_at', { ascending: false })
-      if (cancelled) return
-
-      if (loadError) {
-        console.error('Failed to load votes:', loadError)
-        setError('Could not load votes.')
-        return
-      }
-
-      const loaded = (data ?? []) as VoteRecord[]
-      const open = loaded.find((vote) => vote.status === 'open')
-      const progressResult = open ? await supabase.rpc('vote_progress', { p_vote_id: open.id }) : null
-      if (cancelled) return
-
-      setVotes(loaded)
-      setProgress(((progressResult?.data ?? []) as Progress[])[0] ?? null)
+    if (loadError) {
+      console.error('Failed to load votes:', loadError)
+      setError('Could not load votes.')
+      return
     }
 
-    reloadRef.current = load
-    void load()
-    const timer = window.setInterval(() => void load(), 10000)
+    const loaded = (data ?? []) as VoteRecord[]
+    const open = loaded.find((vote) => vote.status === 'open')
+    const progressResult = open ? await supabase.rpc('vote_progress', { p_vote_id: open.id }) : null
+    if (isCancelled()) return
 
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
-    }
-  }, [])
+    setVotes(loaded)
+    setProgress(((progressResult?.data ?? []) as Progress[])[0] ?? null)
+  }, 10000)
 
   const run = async (action: () => PromiseLike<{ error: { message: string } | null }>, success: string) => {
     setIsBusy(true)
@@ -63,7 +49,7 @@ export const VotesAdmin = () => {
     }
 
     setMessage(success)
-    await reloadRef.current()
+    await reload()
     return true
   }
 

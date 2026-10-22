@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { supabase } from '../utils/supabase/supabase-client'
+import { usePolling } from '../utils/use-polling'
 import {
   buildFakeBars,
   buildLeaderboard,
@@ -275,61 +276,43 @@ export function Poll({ currentUserId, users }: PollProps) {
   const [progress, setProgress] = useState<Progress | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const reloadRef = useRef<() => Promise<void>>(async () => {})
+  const reload = usePolling(async (isCancelled) => {
+    const { data: voteRows, error: votesError } = await supabase
+      .from('votes')
+      .select('id, category, status, created_at, ended_at')
+      .order('created_at', { ascending: false })
+    if (isCancelled()) return
 
-  useEffect(() => {
-    let cancelled = false
-
-    const load = async () => {
-      const { data: voteRows, error: votesError } = await supabase
-        .from('votes')
-        .select('id, category, status, created_at, ended_at')
-        .order('created_at', { ascending: false })
-      if (cancelled) return
-
-      if (votesError) {
-        console.error('Failed to load votes:', votesError)
-        setError('Could not load the poll right now.')
-        setIsLoading(false)
-        return
-      }
-
-      const loaded = (voteRows ?? []) as VoteRecord[]
-      const open = loaded.find((vote) => vote.status === 'open')
-      const [tallyResult, participationResult, progressResult] = await Promise.all([
-        supabase.from('vote_tallies').select('vote_id, candidate_id, ballots'),
-        supabase.from('vote_participation').select('vote_id'),
-        open ? supabase.rpc('vote_progress', { p_vote_id: open.id }) : null,
-      ])
-      if (cancelled) return
-
-      if (tallyResult.error || participationResult.error || progressResult?.error) {
-        console.error('Failed to load poll details:', tallyResult.error ?? participationResult.error ?? progressResult?.error)
-        setError('Could not load the poll right now.')
-        setIsLoading(false)
-        return
-      }
-
-      setError('')
-      setVotes(loaded)
-      setTallies((tallyResult.data ?? []) as TallyRow[])
-      setVotedIds(((participationResult.data ?? []) as { vote_id: string }[]).map((row) => row.vote_id))
-      setProgress(((progressResult?.data ?? []) as Progress[])[0] ?? null)
+    if (votesError) {
+      console.error('Failed to load votes:', votesError)
+      setError('Could not load the poll right now.')
       setIsLoading(false)
+      return
     }
 
-    reloadRef.current = load
-    void load()
-    const timer = window.setInterval(() => void load(), 10000)
-    const onFocus = () => void load()
-    window.addEventListener('focus', onFocus)
+    const loaded = (voteRows ?? []) as VoteRecord[]
+    const open = loaded.find((vote) => vote.status === 'open')
+    const [tallyResult, participationResult, progressResult] = await Promise.all([
+      supabase.from('vote_tallies').select('vote_id, candidate_id, ballots'),
+      supabase.from('vote_participation').select('vote_id'),
+      open ? supabase.rpc('vote_progress', { p_vote_id: open.id }) : null,
+    ])
+    if (isCancelled()) return
 
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
-      window.removeEventListener('focus', onFocus)
+    if (tallyResult.error || participationResult.error || progressResult?.error) {
+      console.error('Failed to load poll details:', tallyResult.error ?? participationResult.error ?? progressResult?.error)
+      setError('Could not load the poll right now.')
+      setIsLoading(false)
+      return
     }
-  }, [])
+
+    setError('')
+    setVotes(loaded)
+    setTallies((tallyResult.data ?? []) as TallyRow[])
+    setVotedIds(((participationResult.data ?? []) as { vote_id: string }[]).map((row) => row.vote_id))
+    setProgress(((progressResult?.data ?? []) as Progress[])[0] ?? null)
+    setIsLoading(false)
+  }, 10000)
 
   return (
     <section className="page-section poll-section">
@@ -353,7 +336,7 @@ export function Poll({ currentUserId, users }: PollProps) {
             hasVoted={votedIds.includes(vote.id)}
             progress={vote.status === 'open' ? progress : null}
             tallies={tallies}
-            onVoted={() => void reloadRef.current()}
+            onVoted={() => void reload()}
           />
         ))
       )}

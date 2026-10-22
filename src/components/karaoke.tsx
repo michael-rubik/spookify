@@ -1,6 +1,7 @@
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { isDevLoginEnabled } from '../utils/dev-login'
 import { supabase } from '../utils/supabase/supabase-client'
+import { usePolling } from '../utils/use-polling'
 import {
   DEFAULT_KARAOKE_DURATION_SECONDS,
   getKaraokeQueueView,
@@ -83,8 +84,12 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
     setNow(new Date())
   }
 
-  const loadQueue = useCallback(async () => {
-    setIsLoading(true)
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const loadQueue = usePolling(async (isCancelled) => {
     setNow(new Date())
 
     if (isDevLoginEnabled()) {
@@ -101,11 +106,11 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
       .select('*')
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
+    if (isCancelled()) return
 
     if (queueError) {
       console.error('Failed to load karaoke queue:', queueError)
       setError('Could not load the karaoke queue right now.')
-      setQueue([])
       setIsLoading(false)
       return
     }
@@ -113,20 +118,7 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
     setQueue((data ?? []) as KaraokeQueueEntry[])
     setIsLoading(false)
     setError('')
-  }, [])
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadQueue()
-    }, 0)
-
-    return () => window.clearTimeout(timer)
-  }, [loadQueue])
+  }, 10000)
 
   const handleAddSong = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -311,12 +303,7 @@ export function Karaoke({ currentUserId, isCurrentUserAdmin }: KaraokeProps) {
   return (
     <section style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gap: '1.25rem' }}>
       <div style={{ border: '1px solid #2a2a2a', borderRadius: '12px', padding: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
-          <h2 style={{ margin: 0 }}>Karaoke Queue</h2>
-          <button type="button" onClick={() => void loadQueue()} disabled={isLoading}>
-            {isLoading ? 'Refreshing...' : 'Refresh queue'}
-          </button>
-        </div>
+        <h2 style={{ margin: '0 0 1rem' }}>Karaoke Queue</h2>
 
         <form onSubmit={handleAddSong} style={{ display: 'grid', gap: '0.8rem' }}>
           <label htmlFor="karaoke-title" style={{ fontWeight: 600 }}>

@@ -43,4 +43,3 @@ _Avoid_: Poll (for the event), election
 **Swipe** — One user's verdict on one pool song. Swiping right means they like the song, swiping left means they do not. Each user swipes a given song once, and the swipe cannot be changed. Unrelated to a ballot: a swipe is attributed to its swiper, never anonymous.
 
 **Spookify score** — A user's reward total from Spookify. Adding a song is worth half a point, swiping left half a point, and swiping right a full point; each right swipe is also worth a full point to the song's submitter. Separate from the click count, and it earns no badges.
-

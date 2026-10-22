@@ -12,6 +12,7 @@ import { Spookify } from './components/spookify'
 import { VotesAdmin } from './components/votes-admin'
 import { grantBadges } from './utils/badges'
 import { formatSpookifyScore } from './utils/spookify'
+import { usePolling } from './utils/use-polling'
 import { getDevAdminUser, getDevSession, isDevLoginEnabled } from './utils/dev-login'
 
 type UserProfile = {
@@ -98,17 +99,15 @@ function App() {
     }
   }, [])
 
-  useEffect(() => {
-    if (!session || isDevLoginEnabled()) {
-      return
-    }
+  const pollingEnabled = !!session && !isDevLoginEnabled()
 
-    let cancelled = false
-    const loadUsers = async () => {
+  usePolling(
+    async (isCancelled) => {
+      if (!session) return
       setLoadingUsers(true)
 
       const { data, error } = await supabase.from('users').select('*').order('name', { ascending: true })
-      if (cancelled) return
+      if (isCancelled()) return
 
       if (error) {
         console.error('Failed to load users:', error)
@@ -122,42 +121,21 @@ function App() {
       setAccountStatus(!ownProfile ? 'missing' : ownProfile.deletion_pending_at ? 'pending' : 'active')
       setUsers(profiles)
       setLoadingUsers(false)
-    }
-
-    void loadUsers()
-    const timer = window.setInterval(() => void loadUsers(), 15000)
-    const onFocus = () => void loadUsers()
-    window.addEventListener('focus', onFocus)
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
-      window.removeEventListener('focus', onFocus)
-    }
-  }, [session])
+    },
+    15000,
+    pollingEnabled,
+  )
 
   // The Poll view stays hidden until the first vote has been started.
-  useEffect(() => {
-    if (!session || isDevLoginEnabled()) {
-      return
-    }
-
-    let cancelled = false
-    const loadHasVotes = async () => {
+  usePolling(
+    async (isCancelled) => {
       const { count, error } = await supabase.from('votes').select('id', { count: 'exact', head: true })
-      if (cancelled || error) return
+      if (isCancelled() || error) return
       setHasVotes((count ?? 0) > 0)
-    }
-
-    void loadHasVotes()
-    const timer = window.setInterval(() => void loadHasVotes(), 15000)
-    const onFocus = () => void loadHasVotes()
-    window.addEventListener('focus', onFocus)
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
-      window.removeEventListener('focus', onFocus)
-    }
-  }, [session])
+    },
+    15000,
+    pollingEnabled,
+  )
 
 
   const handleLogout = async () => {
