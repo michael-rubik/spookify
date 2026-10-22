@@ -9,7 +9,7 @@ export type SpotifyTrackSummary = {
 export type SearchDependencies = {
   verifyUser: (token: string) => Promise<string | null>
   getAccessToken: () => Promise<string>
-  searchTracks: (query: string, accessToken: string) => Promise<unknown>
+  searchTracks: (query: string, accessToken: string, offset: number) => Promise<unknown>
 }
 
 export class SearchError extends Error {
@@ -69,10 +69,42 @@ export function normalizeTracks(payload: unknown, limit = SEARCH_RESULT_LIMIT): 
   return tracks
 }
 
+export type SearchField = 'title' | 'artist'
+
+export type SearchOptions = {
+  fields?: readonly string[]
+  offset?: number
+}
+
+// Spotify caps the search offset at 1000.
+export const MAX_SEARCH_OFFSET = 1000
+
+function normalizeOffset(offset: unknown): number | null {
+  if (offset === undefined) return 0
+  if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0 || offset >= MAX_SEARCH_OFFSET) return null
+  return offset
+}
+
+// Both fields (or none) is a plain search; a single field narrows it to that Spotify field filter.
+export function buildSpotifyQuery(query: string, fields: readonly string[] | undefined): string {
+  const selected = new Set((fields ?? []).filter((field): field is SearchField => field === 'title' || field === 'artist'))
+  if (selected.size !== 1) return query
+  const quoted = `"${query.replace(/["\\]/g, ' ').replace(/\s+/g, ' ').trim()}"`
+  return selected.has('artist') ? `artist:${quoted}` : `track:${quoted}`
+}
+
+function hasMoreResults(payload: unknown, offset: number): boolean {
+  const tracks = asObject(asObject(payload)?.tracks)
+  const items = tracks?.items
+  const itemCount = Array.isArray(items) ? items.length : 0
+  return tracks?.next != null && itemCount > 0 && offset + itemCount < MAX_SEARCH_OFFSET
+}
+
 export async function searchSpookifySongs(
   bearer: string,
   rawQuery: string,
   deps: SearchDependencies,
+  options: SearchOptions = {},
 ): Promise<{ status: number; body: unknown }> {
   const userId = await deps.verifyUser(bearer)
   if (!userId) return { status: 401, body: { error: 'Authentication required.' } }
@@ -81,9 +113,12 @@ export async function searchSpookifySongs(
   if (query === '') return { status: 400, body: { error: 'A search query is required.' } }
   if (query.length > MAX_QUERY_LENGTH) return { status: 400, body: { error: 'The search query is too long.' } }
 
+  const offset = normalizeOffset(options.offset)
+  if (offset === null) return { status: 400, body: { error: 'The page is out of range.' } }
+
   try {
-    const payload = await deps.searchTracks(query, await deps.getAccessToken())
-    return { status: 200, body: { tracks: normalizeTracks(payload) } }
+    const payload = await deps.searchTracks(buildSpotifyQuery(query, options.fields), await deps.getAccessToken(), offset)
+    return { status: 200, body: { tracks: normalizeTracks(payload), offset, hasMore: hasMoreResults(payload, offset) } }
   } catch (error) {
     if (error instanceof SearchError) return { status: error.status, body: { error: error.message } }
     return { status: 502, body: { error: 'Spotify search is unavailable.' } }

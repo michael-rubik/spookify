@@ -94,10 +94,16 @@ have never met, are not the caller's own, and then awards the round's points.
 Apply `20261031_spookify_game_scores.sql` for per-game scores. `users` keeps three
 server-written columns, `submitter_score` (Add song to game), `tinder_score` and
 `fmk_score`, and `spookify_score` is their sum (the number the badge uses). Adding a song
-pays nothing. A right swipe pays the swiper 1 and a left swipe 0.5, plus 0.5 to the
-submitter. An FMK round pays the player 1, the submitter of the sung song 1 and the
+pays nothing. A right swipe pays the swiper 1 and a left swipe 0.5; a right swipe also pays the
+submitter 1. An FMK round pays the player 1, the submitter of the sung song 1 and the
 submitter of the listened song 0.5. The migration rebuilds existing scores from swipe
 history; old add-song points are dropped and FMK scores start at 0.
+
+Apply `20261032_spookify_song_points.sql` for the song leaderboard. `spookify_songs.points`
+holds what a song has earned for its submitter (right swipe 1, sing 1, listen 0.5), written
+only by `private.award_song` from the swipe and FMK functions, and it is the number the song
+leaderboard ranks by. The migration also rebuilds each submitter's score from those points,
+so a left swipe no longer pays the submitter.
 
 Searching Spotify goes through the `spookify-search` Edge Function so the Spotify
 client secret stays on the server; it uses the Client Credentials flow, which reaches

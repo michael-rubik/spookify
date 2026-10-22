@@ -19,12 +19,17 @@ import './spookify.css'
 import './leaderboard.css'
 import { GameNote } from './game-note'
 import { Leaderboard } from './leaderboard'
+import { SongLeaderboard } from './song-leaderboard'
 
 type SpookifyProps = {
   currentUserId: string
 }
 
 const SWIPE_THRESHOLD = 80
+const SEARCH_PAGE_SIZE = 10
+
+type SearchField = 'title' | 'artist'
+type SearchRequest = { query: string; fields: SearchField[] }
 
 const FMK_LABELS: Record<FmkChoice, string> = { sing: '🎤 Sing', listen: '🎧 Listen', delete: '🗑️ Delete' }
 
@@ -49,6 +54,10 @@ export function Spookify({ currentUserId }: SpookifyProps) {
   const [sourceError, setSourceError] = useState('')
   const [sourceMessage, setSourceMessage] = useState('')
   const [pooledTrackIds, setPooledTrackIds] = useState<string[]>([])
+  const [searchFields, setSearchFields] = useState<SearchField[]>(['title', 'artist'])
+  const [lastSearch, setLastSearch] = useState<SearchRequest | null>(null)
+  const [searchOffset, setSearchOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
 
   const [song, setSong] = useState<SpookifySong | null>(null)
   const [isLoadingSong, setIsLoadingSong] = useState(true)
@@ -126,6 +135,32 @@ export function Spookify({ currentUserId }: SpookifyProps) {
     )
   }
 
+  const runSearch = async (search: SearchRequest, offset: number) => {
+    setIsSearching(true)
+    setSourceError('')
+    setSourceMessage('')
+    const { data, error } = await supabase.functions.invoke('spookify-search', {
+      body: { query: search.query, fields: search.fields, offset },
+    })
+    setIsSearching(false)
+
+    if (error) {
+      console.error('Spotify search failed:', error)
+      setResults([])
+      setHasMore(false)
+      setSourceError('Spotify search is unavailable right now.')
+      return
+    }
+
+    const payload = data as { tracks?: SpookifyTrack[]; hasMore?: boolean } | null
+    const tracks = payload?.tracks ?? []
+    setLastSearch(search)
+    setSearchOffset(offset)
+    setHasMore(Boolean(payload?.hasMore))
+    setResults(markAlreadyAdded(tracks, pooledTrackIds))
+    if (tracks.length === 0) setSourceMessage(offset > 0 ? 'No more songs.' : 'No songs matched that search.')
+  }
+
   const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const trimmed = query.trim()
@@ -134,22 +169,15 @@ export function Spookify({ currentUserId }: SpookifyProps) {
       return
     }
 
-    setIsSearching(true)
-    setSourceError('')
-    setSourceMessage('')
-    const { data, error } = await supabase.functions.invoke('spookify-search', { body: { query: trimmed } })
-    setIsSearching(false)
+    await runSearch({ query: trimmed, fields: searchFields }, 0)
+  }
 
-    if (error) {
-      console.error('Spotify search failed:', error)
-      setResults([])
-      setSourceError('Spotify search is unavailable right now.')
-      return
-    }
-
-    const tracks = (data as { tracks?: SpookifyTrack[] } | null)?.tracks ?? []
-    setResults(markAlreadyAdded(tracks, pooledTrackIds))
-    if (tracks.length === 0) setSourceMessage('No songs matched that search.')
+  const toggleSearchField = (field: SearchField) => {
+    setSearchFields((current) => {
+      if (!current.includes(field)) return [...current, field]
+      // Keep at least one field selected.
+      return current.length > 1 ? current.filter((value) => value !== field) : current
+    })
   }
 
   const handleAdd = async (track: SpookifyTrack) => {
@@ -283,7 +311,7 @@ export function Spookify({ currentUserId }: SpookifyProps) {
       {panel === 'source' ? (
         <div className="card stack">
           <GameNote gameId="source">
-            Adding a song pays nothing. You earn points when others play your songs: +0.5 per left swipe in Tinder,
+            Adding a song pays nothing. You earn points when others play your songs: +1 per right swipe in Tinder,
             +1 each time a song is sung and +0.5 each time it is listened to in FMK.
           </GameNote>
           <p className="muted">Search Spotify and add songs to the pool.</p>
@@ -306,6 +334,20 @@ export function Spookify({ currentUserId }: SpookifyProps) {
               {isSearching ? 'Searching...' : 'Search'}
             </button>
           </form>
+
+          <div className="row spookify-search-fields" role="group" aria-label="Search in">
+            {(['title', 'artist'] as const).map((field) => (
+              <button
+                key={field}
+                type="button"
+                className={`tag-chip${searchFields.includes(field) ? ' is-selected' : ''}`}
+                aria-pressed={searchFields.includes(field)}
+                onClick={() => toggleSearchField(field)}
+              >
+                {field === 'title' ? 'Title' : 'Artist'}
+              </button>
+            ))}
+          </div>
 
           {sourceError && <p role="alert" className="form-error">{sourceError}</p>}
           {sourceMessage && <p role="status" className="form-success">{sourceMessage}</p>}
@@ -332,12 +374,32 @@ export function Spookify({ currentUserId }: SpookifyProps) {
               </li>
             ))}
           </ul>
+          {lastSearch && (searchOffset > 0 || hasMore) && (
+            <div className="row row--between spookify-pagination">
+              <button
+                type="button"
+                disabled={isSearching || searchOffset === 0}
+                onClick={() => void runSearch(lastSearch, Math.max(0, searchOffset - SEARCH_PAGE_SIZE))}
+              >
+                Previous
+              </button>
+              <span className="muted">Page {searchOffset / SEARCH_PAGE_SIZE + 1}</span>
+              <button
+                type="button"
+                disabled={isSearching || !hasMore}
+                onClick={() => void runSearch(lastSearch, searchOffset + SEARCH_PAGE_SIZE)}
+              >
+                Next
+              </button>
+            </div>
+          )}
           <Leaderboard userId={currentUserId} column="submitter_score" label="Add song to game" />
+          <SongLeaderboard />
         </div>
       ) : panel === 'tinder' ? (
         <div className="card stack spookify-tinder">
           <GameNote gameId="tinder">
-            Swipe right for +1 and left for +0.5. When you swipe left, the person who added the song also earns +0.5.
+            Swipe right for +1 and left for +0.5. When you swipe right, the person who added the song also earns +1.
           </GameNote>
           <p className="muted">Swipe right if you like the song, left if you do not. One swipe per song.</p>
 

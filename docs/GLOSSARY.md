@@ -44,7 +44,7 @@ _Avoid_: Poll (for the event), election
 
 **Spookify score** — A user's reward total from Spookify: the sum of their Add song to game score, Spookify Tinder score and Spookify FMK score. Separate from the click count; reaching a score of 100 earns a badge.
 
-**Add song to game score** — Points a submitter earns when other users interact with their songs in the other games, never from adding a song itself. A swipe left on their song is worth half a point, a swipe right nothing, a sing choice one point and a listen choice half a point.
+**Add song to game score** — Points a submitter earns when other users interact with their songs in the other games, never from adding a song itself. A swipe right on their song is worth one point, a swipe left nothing, a sing choice one point and a listen choice half a point. The same points add up per song for the **Song leaderboard**, which ranks songs, shows their submitter and can be filtered to one user's songs.
 
 **Spookify Tinder score** — Points a user earns by swiping: a full point per swipe right and half a point per swipe left.
 

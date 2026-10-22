@@ -14,7 +14,7 @@ export type SpookifySong = SpookifyTrack & {
 }
 
 const SWIPER_REWARD: Record<SwipeDirection, number> = { right: 1, left: 0.5 }
-const SUBMITTER_REWARD: Record<SwipeDirection, number> = { right: 0, left: 0.5 }
+const SUBMITTER_REWARD: Record<SwipeDirection, number> = { right: 1, left: 0 }
 
 export const swiperReward = (direction: SwipeDirection): number => SWIPER_REWARD[direction]
 export const submitterReward = (direction: SwipeDirection): number => SUBMITTER_REWARD[direction]

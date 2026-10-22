@@ -12,6 +12,7 @@ const migrations = [
   'supabase/migrations/20261029_add_spookify.sql',
   'supabase/migrations/20261030_add_spookify_fmk.sql',
   'supabase/migrations/20261031_spookify_game_scores.sql',
+  'supabase/migrations/20261032_spookify_song_points.sql',
 ].map((path) => readFileSync(path, 'utf8'))
 
 describe.each([
@@ -85,6 +86,13 @@ describe.each([
     )
     return rows[0].score
   }
+  const songPoints = async (songId: string) => {
+    await db.exec('reset role')
+    const { rows } = await db.query<{ points: number }>(
+      'select points::float8 as points from public.spookify_songs where id = $1', [songId],
+    )
+    return rows[0].points
+  }
   const nextSong = async (user: string) => {
     await asUser(user)
     const { rows } = await db.query<{ id: string; title: string }>('select * from public.next_spookify_song()')
@@ -127,6 +135,9 @@ describe.each([
       expect(await scoreOf(ben)).toBe(1)
       expect(await scoreOf(ann, 'submitter_score')).toBe(1.5)
       expect(await scoreOf(ann)).toBe(1.5)
+      expect(await songPoints(first)).toBe(1)
+      expect(await songPoints(second)).toBe(0.5)
+      expect(await songPoints(third)).toBe(0)
       await db.exec('reset role')
       const { rows } = await db.query<{ song_id: string; points: number; deleted: boolean }>(
         'select song_id, points, deleted from public.spookify_fmk_tiers where user_id = $1', [ben],
@@ -215,21 +226,22 @@ describe.each([
     expect(rows[0].n).toBe(1)
   })
 
-  it('pays a right swipe   one point to the swiper and nothing to the submitter', async () => {
+  it('pays a right swipe     one point to the swiper and one to the submitter', async () => {
     const songId = await addSong(ann, 'track-1')
     await swipe(ben, songId, 'right')
     expect(await scoreOf(ben)).toBe(1)
       expect(await scoreOf(ben, 'tinder_score')).toBe(1)
-      expect(await scoreOf(ann)).toBe(0)
+      expect(await scoreOf(ann, 'submitter_score')).toBe(1)
+      expect(await scoreOf(ann)).toBe(1)
+      expect(await songPoints(songId)).toBe(1)
     })
 
-    it('pays a left swipe half a point to the swiper and half a point to the submitter', async () => {
+    it('pays a left swipe half a point to the swiper and nothing to the submitter', async () => {
       const songId = await addSong(ann, 'track-1')
       await swipe(ben, songId, 'left')
       expect(await scoreOf(ben)).toBe(0.5)
-      expect(await scoreOf(ann)).toBe(0.5)
-      expect(await scoreOf(ann, 'submitter_score')).toBe(0.5)
-      expect(await scoreOf(ann, 'tinder_score')).toBe(0)
+      expect(await scoreOf(ann)).toBe(0)
+      expect(await songPoints(songId)).toBe(0)
   })
 
   it('records the direction of each swipe and keeps it private to the swiper', async () => {
@@ -248,7 +260,7 @@ describe.each([
     await expect(db.query('select public.swipe_spookify_song($1, $2)', [songId, 'right']))
       .rejects.toThrow('already swiped')
     expect(await scoreOf(ben)).toBe(0.5)
-    expect(await scoreOf(ann)).toBe(0.5)
+    expect(await scoreOf(ann)).toBe(0)
   })
 
   it('refuses a swipe on your own song, an unknown song and a sideways swipe', async () => {

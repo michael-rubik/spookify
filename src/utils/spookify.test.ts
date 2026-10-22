@@ -33,9 +33,9 @@ describe('spookify rewards', () => {
     expect(swiperReward('left')).toBe(0.5)
   })
 
-  it('pays the submitter half a point per left swipe and nothing for a right swipe', () => {
-    expect(submitterReward('right')).toBe(0)
-    expect(submitterReward('left')).toBe(0.5)
+  it('pays the submitter a point per right swipe and nothing for a left swipe', () => {
+    expect(submitterReward('right')).toBe(1)
+    expect(submitterReward('left')).toBe(0)
   })
 })
 
@@ -186,6 +186,8 @@ describe('searchSpookifySongs', () => {
     const result = await searchSpookifySongs('valid', '  thriller  ', searchFixture())
     expect(result.status).toBe(200)
     expect(result.body).toEqual({
+      offset: 0,
+      hasMore: false,
       tracks: [{
         spotify_track_id: 'thriller',
         title: 'spotify-token',
@@ -194,6 +196,31 @@ describe('searchSpookifySongs', () => {
         spotify_url: null,
       }],
     })
+  })
+
+  it('narrows the Spotify query to one field and pages with an offset', async () => {
+    const seen: { query: string; offset: number }[] = []
+    const deps = searchFixture()
+    deps.searchTracks = async (query, _token, offset) => {
+      seen.push({ query, offset })
+      return { tracks: { items: [{ id: 'x', name: 'N', artists: [{ name: 'A' }] }], next: 'https://next' } }
+    }
+    const artistOnly = await searchSpookifySongs('valid', 'Queen', deps, { fields: ['artist'], offset: 10 })
+    await searchSpookifySongs('valid', 'He said "hi"', deps, { fields: ['title'] })
+    await searchSpookifySongs('valid', 'Queen', deps, { fields: ['title', 'artist'] })
+    expect(seen).toEqual([
+      { query: 'artist:"Queen"', offset: 10 },
+      { query: 'track:"He said hi"', offset: 0 },
+      { query: 'Queen', offset: 0 },
+    ])
+    expect(artistOnly.body).toMatchObject({ offset: 10, hasMore: true })
+  })
+
+  it('reports the last page and rejects an out-of-range offset', async () => {
+    const last = await searchSpookifySongs('valid', 'thriller', searchFixture())
+    expect(last.body).toMatchObject({ hasMore: false })
+    expect(await searchSpookifySongs('valid', 'thriller', searchFixture(), { offset: -1 })).toMatchObject({ status: 400 })
+    expect(await searchSpookifySongs('valid', 'thriller', searchFixture(), { offset: 1000 })).toMatchObject({ status: 400 })
   })
 
   it('passes a Spotify rate limit through and hides unexpected failures', async () => {

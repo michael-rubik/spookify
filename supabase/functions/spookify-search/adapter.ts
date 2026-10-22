@@ -38,11 +38,12 @@ export function createSearchDependencies(
       cachedToken = { value: payload.access_token, expiresAt: Date.now() + Math.max(0, lifetime - 60) * 1000 }
       return cachedToken.value
     },
-    async searchTracks(query, accessToken) {
+    async searchTracks(query, accessToken, offset) {
       const endpoint = new URL(SEARCH_ENDPOINT)
       endpoint.searchParams.set('q', query)
       endpoint.searchParams.set('type', 'track')
       endpoint.searchParams.set('limit', String(SEARCH_RESULT_LIMIT))
+      endpoint.searchParams.set('offset', String(offset))
       const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${accessToken}` } })
       if (response.status === 429) throw new SearchError(429, 'Spotify is busy. Please try again shortly.')
       if (response.status === 401) cachedToken = null

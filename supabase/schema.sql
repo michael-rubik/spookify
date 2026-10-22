@@ -577,6 +577,16 @@ begin
 end;
 $$;
 revoke all on function private.award_spookify(uuid, numeric, numeric, numeric) from public, anon, authenticated;
+
+create or replace function private.award_song(p_song uuid, p_points numeric)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  update public.spookify_songs set points = points + p_points where id = p_song;
+end;
+$$;
+revoke all on function private.award_song(uuid, numeric) from public, anon, authenticated;
 create or replace trigger guard_profile_changes before insert or update on public.users
 for each row execute function private.guard_profile_changes();
 
@@ -874,6 +884,7 @@ create table if not exists public.spookify_songs (
   artist text not null check (btrim(artist) <> '' and char_length(artist) <= 200),
   album_art_url text,
   spotify_url text,
+  points numeric(8,1) not null default 0,
   added_by uuid not null references public.users(id) on delete cascade,
   created_at timestamptz not null default now()
 );
@@ -972,8 +983,9 @@ begin
     raise exception 'You have already swiped on this song' using errcode = 'P0001';
   end;
   perform private.award_spookify(swiper, case when p_direction = 'right' then 1 else 0.5 end, 0, 0);
-  if p_direction = 'left' then
-    perform private.award_spookify(submitter, 0, 0, 0.5);
+  if p_direction = 'right' then
+    perform private.award_spookify(submitter, 0, 0, 1);
+    perform private.award_song(p_song_id, 1);
   end if;
 end;
 $$;
@@ -1161,6 +1173,8 @@ begin
   perform private.award_spookify(chooser, 0, 1, 0);
   perform private.award_spookify(sing_submitter, 0, 0, 1);
   perform private.award_spookify(listen_submitter, 0, 0, 0.5);
+  perform private.award_song(p_sing, 1);
+  perform private.award_song(p_listen, 0.5);
 end;
 $$;
 
