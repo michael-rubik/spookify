@@ -16,6 +16,7 @@ const migrations = [
   'supabase/migrations/20261033_songmaster_badge.sql',
   'supabase/migrations/20261034_battle_pass.sql',
   'supabase/migrations/20261035_lock_progress_and_email.sql',
+  'supabase/migrations/20261036_unique_costumes.sql',
 ].map((path) => readFileSync(path, 'utf8'))
 
 const REGULAR = ['clicker', 'songmaster', 'spooker', 'tagged', 'fan', 'karaoke', 'swipes', 'fmk', 'voter']
@@ -106,6 +107,29 @@ describe.each([
     await db.exec('reset role')
     const { rows } = await db.query<{ badge_id: string }>('select badge_id from public.badge_points')
     expect(rows.map((row) => row.badge_id).sort()).toEqual([...REGULAR, 'winner-winner'].sort())
+  })
+
+  it('keeps costumes unique ignoring case and spaces, for signup, edits and the pre-check', async () => {
+    await db.exec('reset role')
+    await db.query("update public.users set costume = 'Ghost' where id = $1", [ann])
+    await expect(db.query("update public.users set costume = '  gHOST ' where id = $1", [ben])).rejects.toThrow(
+      'Costume already taken',
+    )
+    await db.query("update public.users set costume = 'Ghost' where id = $1", [ann])
+    await db.query("update public.users set costume = 'Witch' where id = $1", [ann])
+    await db.query("update public.users set costume = 'Ghost' where id = $1", [ben])
+
+    await expect(
+      db.query(
+        'insert into auth.users (id,email,raw_user_meta_data) values (gen_random_uuid(), $1, $2)',
+        ['new@example.com', JSON.stringify({ signup_code: 'SEED', name: 'N', costume: 'GHOST' })],
+      ),
+    ).rejects.toThrow('Costume already taken')
+
+    await db.exec('reset role; set role anon')
+    const taken = await db.query<{ costume_available: boolean }>("select public.costume_available(' ghost')")
+    const free = await db.query<{ costume_available: boolean }>("select public.costume_available('Vampire')")
+    expect([taken.rows[0].costume_available, free.rows[0].costume_available]).toEqual([false, true])
   })
 
   it('stops users editing their own badges, clicks and email, while admins still can', async () => {

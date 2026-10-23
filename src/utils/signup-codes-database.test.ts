@@ -64,7 +64,7 @@ describe.each([
     db.query('insert into auth.users (id,email,raw_user_meta_data) values ($1,$2,$3)', [
       newId(),
       email,
-      JSON.stringify({ name: 'Boo', costume: 'Ghost', ...(code === null ? {} : { signup_code: code }) }),
+      JSON.stringify({ name: 'Boo', costume: `Ghost ${id}`, ...(code === null ? {} : { signup_code: code }) }),
     ])
   const addCode = (code: string, seats: number) =>
     db.query('insert into public.signup_codes (code, seats) values ($1,$2)', [code, seats])

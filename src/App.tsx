@@ -280,7 +280,11 @@ function App() {
       setProfileMessage('Profile saved successfully.')
     } catch (error) {
       console.error('Failed to save profile:', error)
-      setProfileError('Could not save your profile. Please try again.')
+      setProfileError(
+        (error as { code?: string } | null)?.code === '23505'
+          ? 'Someone already has that costume. Please pick another one.'
+          : 'Could not save your profile. Please try again.',
+      )
     } finally {
       setIsSavingProfile(false)
     }

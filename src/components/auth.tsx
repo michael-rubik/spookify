@@ -25,6 +25,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const isValidEmail = (value: string) => EMAIL_REGEX.test(value.trim())
 
+const COSTUME_TAKEN_MESSAGE = 'Someone already has that costume. Please pick another one.'
 const INVALID_SIGNUP_CODE_MESSAGE = 'Dieser Code hilft dir nicht, frag Rubik nach einem SignUp Code'
 
 type AuthProps = {
@@ -77,6 +78,14 @@ export const Auth = ({ onDevLogin }: AuthProps) => {
         const cleanedName = form.name.trim()
         const cleanedCostume = form.costume.trim()
         const cleanedSignupCode = form.signupCode.trim()
+
+        const { data: costumeFree, error: costumeError } = await supabase.rpc('costume_available', {
+          p_costume: cleanedCostume,
+        })
+        if (!costumeError && costumeFree === false) {
+          setError(COSTUME_TAKEN_MESSAGE)
+          return
+        }
 
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email: cleanedEmail,
