@@ -3,20 +3,54 @@ import type { FormEvent } from 'react'
 import { supabase } from '../utils/supabase/supabase-client'
 import { usePolling } from '../utils/use-polling'
 import { progressPercent, type VoteRecord } from '../utils/votes'
+import { clampPoints, DEFAULT_CUSTOM_POINTS, MAX_BADGE_POINTS } from '../utils/battle-pass'
 
 type Progress = { voted: number; eligible: number }
+
+type WinnerPointsFieldProps = {
+  vote: VoteRecord
+  disabled: boolean
+  onSave: (vote: VoteRecord, value: number) => unknown
+}
+
+const WinnerPointsField = ({ vote, disabled, onSave }: WinnerPointsFieldProps) => {
+  const [draft, setDraft] = useState<string | null>(null)
+  const current = vote.winner_points ?? DEFAULT_CUSTOM_POINTS
+
+  return (
+    <label className="row">
+      <span className="muted">Winner XP</span>
+      <input
+        type="number"
+        min={0}
+        max={MAX_BADGE_POINTS}
+        disabled={disabled}
+        aria-label={`Winner XP for ${vote.category}`}
+        value={draft ?? String(current)}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => {
+          if (draft === null) return
+          const next = clampPoints(Number(draft))
+          setDraft(null)
+          if (next !== current) void onSave(vote, next)
+        }}
+      />
+    </label>
+  )
+}
 
 export const VotesAdmin = () => {
   const [votes, setVotes] = useState<VoteRecord[]>([])
   const [progress, setProgress] = useState<Progress | null>(null)
   const [category, setCategory] = useState('')
+  const [winnerPoints, setWinnerPoints] = useState(String(DEFAULT_CUSTOM_POINTS))
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [isBusy, setIsBusy] = useState(false)
   const reload = usePolling(async (isCancelled) => {
     const { data, error: loadError } = await supabase
       .from('votes')
-      .select('id, category, status, created_at, ended_at')
+      .select('id, category, status, created_at, ended_at, winner_points')
       .order('created_at', { ascending: false })
     if (isCancelled()) return
 
@@ -61,10 +95,13 @@ export const VotesAdmin = () => {
       return
     }
 
-    if (await run(() => supabase.rpc('start_vote', { p_category: cleaned }), 'Vote started.')) {
+    if (await run(() => supabase.rpc('start_vote', { p_category: cleaned, p_winner_points: clampPoints(Number(winnerPoints)) }), 'Vote started.')) {
       setCategory('')
     }
   }
+
+  const handleWinnerPoints = (vote: VoteRecord, value: number) =>
+    run(() => supabase.rpc('set_vote_winner_points', { p_vote_id: vote.id, p_points: value }), 'Winner XP saved.')
 
   const handleEnd = (vote: VoteRecord) => {
     if (!window.confirm(`End "${vote.category}" and publish the results?`)) return
@@ -107,6 +144,7 @@ export const VotesAdmin = () => {
           <p className="muted">
             {progress ? `${progress.voted} of ${progress.eligible} voted (${progressPercent(progress.voted, progress.eligible)}%)` : 'Loading progress...'}
           </p>
+          <WinnerPointsField vote={openVote} disabled={isBusy} onSave={handleWinnerPoints} />
           <div className="row">
             <button type="button" disabled={isBusy} onClick={() => handleEnd(openVote)}>
               End vote
@@ -131,6 +169,16 @@ export const VotesAdmin = () => {
           <button type="submit" disabled={isBusy}>
             Start vote
           </button>
+          <label htmlFor="vote-winner-points">Winner XP</label>
+          <input
+            id="vote-winner-points"
+            type="number"
+            min={0}
+            max={MAX_BADGE_POINTS}
+            required
+            value={winnerPoints}
+            onChange={(event) => setWinnerPoints(event.target.value)}
+          />
         </form>
       )}
 
@@ -141,6 +189,7 @@ export const VotesAdmin = () => {
               <span>
                 {vote.category} <span className="muted">· ended {vote.ended_at ? new Date(vote.ended_at).toLocaleString() : ''}</span>
               </span>
+              <WinnerPointsField vote={vote} disabled={isBusy} onSave={handleWinnerPoints} />
               <button type="button" disabled={isBusy} onClick={() => handleDelete(vote)}>
                 Delete
               </button>

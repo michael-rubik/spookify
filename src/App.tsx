@@ -12,6 +12,9 @@ import { Spooks } from './components/spooks'
 import { Spookify } from './components/spookify'
 import { VotesAdmin } from './components/votes-admin'
 import { badgeDisplayName, CUSTOM_BADGE_MAX_LENGTH, giveCustomBadge, grantBadges } from './utils/badges'
+import { clampPoints, DEFAULT_CUSTOM_POINTS, hasUnseenBadges, MAX_BADGE_POINTS, PASS_BADGES } from './utils/battle-pass'
+import { BattlePass } from './components/battle-pass'
+import { BadgePointsAdmin } from './components/badge-points-admin'
 import { formatSpookifyScore } from './utils/spookify'
 import { usePolling } from './utils/use-polling'
 import { navigate, useRoute } from './utils/use-route'
@@ -39,6 +42,16 @@ type ProfileDraft = {
 }
 
 const emptyProfileDraft: ProfileDraft = { name: '', costume: '', email: '' }
+
+function readSeenBadges(userId: string | undefined): string[] {
+  if (!userId) return []
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(`spookify:seen-badges:${userId}`) ?? '[]')
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
 
 function App() {
   const initialDevUser = getDevAdminUser()
@@ -74,8 +87,11 @@ function App() {
   const [renameDraft, setRenameDraft] = useState('')
   const [renameError, setRenameError] = useState('')
   const [isRenaming, setIsRenaming] = useState(false)
-  const [dismissedBadgeIds, setDismissedBadgeIds] = useState<string[]>([])
+  const [seenByUser, setSeenByUser] = useState<Record<string, string[]>>({})
+  const [badgeProgress, setBadgeProgress] = useState<Record<string, number>>({})
   const [badgeLabel, setBadgeLabel] = useState('')
+  const [badgePoints, setBadgePoints] = useState(String(DEFAULT_CUSTOM_POINTS))
+  const [pointsRefresh, setPointsRefresh] = useState(0)
   const [badgeRecipientIds, setBadgeRecipientIds] = useState<string[]>([])
   const [isGivingBadge, setIsGivingBadge] = useState(false)
   const [badgeFeedback, setBadgeFeedback] = useState('')
@@ -119,7 +135,7 @@ function App() {
     hasLoadedUsers.current = false
   }, [sessionUserId])
 
-  usePolling(
+  const reloadUsers = usePolling(
     async (isCancelled) => {
       if (!session) return
       // Only the first load shows a loading state; background refetches swap values in silently.
@@ -177,6 +193,39 @@ function App() {
   const isCurrentUserAdmin = accountStatus === 'active' && Boolean(currentUser?.is_admin && !currentUser.deletion_pending_at)
   const activeUsers = users.filter((user) => !user.deletion_pending_at)
   const hasAnyAdminUsers = users.some((user) => user.is_admin)
+
+  // Asking for progress also awards any badge whose goal was reached; reload the users when that happens.
+  usePolling(
+    async (isCancelled) => {
+      const { data, error } = await supabase.rpc('my_badge_progress')
+      if (isCancelled() || error) return
+
+      const rows = (data ?? []) as { badge_id: string; progress: number | string }[]
+      const progress = Object.fromEntries(rows.map((row) => [row.badge_id, Number(row.progress)]))
+      setBadgeProgress(progress)
+
+      const held = currentUser?.badges ?? []
+      if (PASS_BADGES.some((badge) => (progress[badge.id] ?? 0) >= badge.target && !held.includes(badge.id))) {
+        await reloadUsers()
+      }
+    },
+    15000,
+    pollingEnabled && accountStatus === 'active',
+  )
+
+  const heldBadgeIds = currentUser?.badges ?? []
+  const seenBadgeIds = seenByUser[sessionUserId ?? ''] ?? readSeenBadges(sessionUserId)
+  // Opening the pass marks everything held as seen (adjusted during render, like the clicker's count sync).
+  if (sessionUserId && view === 'battlepass' && hasUnseenBadges(heldBadgeIds, seenBadgeIds)) {
+    setSeenByUser((current) => ({ ...current, [sessionUserId]: heldBadgeIds }))
+  }
+  const hasNewBadges = view !== 'battlepass' && hasUnseenBadges(heldBadgeIds, seenBadgeIds)
+
+  useEffect(() => {
+    for (const [userId, ids] of Object.entries(seenByUser)) {
+      window.localStorage.setItem(`spookify:seen-badges:${userId}`, JSON.stringify(ids))
+    }
+  }, [seenByUser])
 
 
   const handleSaveProfile = async (event: FormEvent<HTMLFormElement>) => {
@@ -384,6 +433,16 @@ function App() {
 
     setIsGivingBadge(true)
     setBadgeFeedback('')
+    const { error: pointsError } = await supabase
+      .from('custom_badge_points')
+      .upsert({ label, points: clampPoints(Number(badgePoints)) })
+    if (pointsError) {
+      console.error('Failed to save custom badge points:', pointsError)
+      setBadgeFeedback('Could not save the badge points; badge not given.')
+      setIsGivingBadge(false)
+      return
+    }
+    setPointsRefresh((count) => count + 1)
     const targets = users.filter((user) => !user.deletion_pending_at && badgeRecipientIds.includes(user.id))
     const results = await Promise.all(
       targets.map(async (user) => {
@@ -444,7 +503,6 @@ function App() {
     setUsers((current) =>
       current.map((user) => (resetIds.has(user.id) ? { ...user, badges: [], click_count: 0 } : user)),
     )
-    setDismissedBadgeIds([])
   }
 
   const handleDeleteUser = async (userId: string) => {
@@ -531,18 +589,13 @@ function App() {
         user.id === userId ? { ...user, click_count: nextCount, badges: nextBadges } : user,
       ),
     )
-    // Forget dismissals for badges that are no longer held (e.g. after a failed save).
-    setDismissedBadgeIds((current) => current.filter((id) => nextBadges.includes(id)))
-  }
-
-  const handleDismissBadge = (badgeId: string) => {
-    setDismissedBadgeIds((current) => (current.includes(badgeId) ? current : [...current, badgeId]))
   }
 
   const navItems: { key: View; label: string; icon: string }[] = [
     { key: 'spooks', label: 'Spooks', icon: '🎃' },
     { key: 'karaoke', label: 'Karaoke', icon: '🎤' },
     ...(isDevLoginEnabled() ? [] : [{ key: 'spookify' as const, label: 'Spookify', icon: '🎧' }]),
+    { key: 'battlepass', label: 'Pass', icon: '🏆' },
     ...(hasVotes ? [{ key: 'poll' as const, label: 'Poll', icon: '🗳️' }] : []),
     ...(isCurrentUserAdmin ? [{ key: 'admin' as const, label: 'Admin', icon: '🛡️' }] : []),
   ]
@@ -600,6 +653,14 @@ function App() {
                 Spookify
               </button>
             )}
+            <button
+              type="button"
+              className={`nav-button${view === 'battlepass' ? ' is-active' : ''}`}
+              onClick={() => setView('battlepass')}
+            >
+              Pass
+              {hasNewBadges && <span className="nav-dot" data-testid="pass-dot" aria-hidden="true" />}
+            </button>
             {hasVotes && (
               <button
                 type="button"
@@ -675,10 +736,10 @@ function App() {
           userId={session.user.id}
           clickCount={currentUser?.click_count ?? 0}
           badges={currentUser?.badges ?? []}
-          dismissedBadgeIds={dismissedBadgeIds}
           onProgress={(nextCount, nextBadges) => updateUserProgress(session.user.id, nextCount, nextBadges)}
-          onDismissBadge={handleDismissBadge}
         />
+      ) : view === 'battlepass' ? (
+        <BattlePass badges={currentUser?.badges ?? []} progress={badgeProgress} />
       ) : view === 'admin' ? (
         <section className="page-section">
           <h2>Admin Panel</h2>
@@ -714,6 +775,16 @@ function App() {
                     maxLength={CUSTOM_BADGE_MAX_LENGTH}
                     onChange={(event) => setBadgeLabel(event.target.value)}
                   />
+                  <label htmlFor="custom-badge-points">Points (XP)</label>
+                  <input
+                    id="custom-badge-points"
+                    type="number"
+                    required
+                    min={0}
+                    max={MAX_BADGE_POINTS}
+                    value={badgePoints}
+                    onChange={(event) => setBadgePoints(event.target.value)}
+                  />
                   <fieldset className="stack">
                     <legend>Users</legend>
                     {activeUsers.map((user) => (
@@ -746,7 +817,7 @@ function App() {
                     </button>
                     <button
                       type="submit"
-                      disabled={isGivingBadge || !badgeLabel.trim() || badgeRecipientIds.length === 0}
+                      disabled={isGivingBadge || !badgeLabel.trim() || badgePoints.trim() === '' || badgeRecipientIds.length === 0}
                     >
                       {isGivingBadge ? 'Giving...' : `Give badge to ${badgeRecipientIds.length} user(s)`}
                     </button>
@@ -754,6 +825,8 @@ function App() {
                   {badgeFeedback && <p role="status">{badgeFeedback}</p>}
                 </form>
               </div>
+
+              <BadgePointsAdmin key={pointsRefresh} />
 
               <SignupCodes />
               <VotesAdmin />
@@ -1032,6 +1105,7 @@ function App() {
             >
               <span className="bottom-nav-icon" aria-hidden="true">
                 {item.icon}
+                {item.key === 'battlepass' && hasNewBadges && <span className="nav-dot" data-testid="pass-dot" />}
               </span>
               <span>{item.label}</span>
             </button>

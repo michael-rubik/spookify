@@ -1,0 +1,79 @@
+.battle-pass-xp {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.battle-pass-bar {
+  height: 0.9rem;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.battle-pass-bar--small {
+  height: 0.45rem;
+}
+
+.battle-pass-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+
+.battle-pass-track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+  text-align: left;
+}
+
+.battle-pass-node {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.battle-pass-node.is-locked {
+  opacity: 0.7;
+}
+
+.battle-pass-node.is-earned {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.battle-pass-marker {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+}
+
+.is-earned .battle-pass-marker {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 700;
+}
+
+.battle-pass-body {
+  flex: 1;
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.battle-pass-message {
+  margin: 0;
+  font-style: italic;
+}

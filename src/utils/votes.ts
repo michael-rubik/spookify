@@ -4,6 +4,7 @@ export type VoteRecord = {
   status: 'open' | 'ended'
   created_at: string
   ended_at: string | null
+  winner_points?: number
 }
 
 export type TallyRow = {

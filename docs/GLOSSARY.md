@@ -12,7 +12,19 @@
 
 **Badge** — A reward a user earns when they meet that badge's condition: a click count threshold, a Spookify score of 100, 10 spooks posted, being tagged in 10 spooks, or 10 right swipes on a single song they added. Each badge has a badge message shown to the user. Once earned it is kept even if the condition later stops holding; an admin resetting clicks removes only the click badge. Tags on a user's own spooks do not count towards being tagged.
 
-**Badge message** — The text attached to a badge, visible only to its owner on the clicker view while the badge is held.
+**Badge message** — The text attached to a badge, visible only to its owner on the battle pass while the badge is held. Locked badges show only their goal and progress.
+
+**Regular badge** — One of the nine built-in badges with a condition: clicks, Spookify score, spooks posted, being tagged, right swipes on one song, karaoke songs performed (3), Spookify Tinder swipes (50), FMK rounds finished (25) and casting a ballot. Not custom badges or winner badges.
+
+**Winner winner** — The final badge, with the message "chicken dinner". Earned when a user holds every regular badge, that is, the full regular XP. Custom badges and winner badges never count towards it.
+
+**Custom badge** — A badge an admin gives with its own text. The admin must set its points (default 10); the points belong to the text and stay editable.
+
+**XP** — A user's total badge points: the sum of the current points of every badge they hold, regular, Winner winner, custom and winner badges alike. Points are awarded only on unlock. It is always derived, so an admin changing a badge's points changes everyone's XP at once.
+
+**Badge points** — The XP one badge is worth. Admins edit them per badge; defaults are 100, 200 or 300 for regular badges and 500 for Winner winner. A vote carries its own winner points (default 10, set by the admin) for its winner badge.
+
+**Battle pass** — The view showing every badge as a node on one XP track, ordered from cheapest to most valuable with Winner winner last. Earned nodes light up, open ones show progress, and a Collected strip shows custom and winner badges. A dot on its tab marks newly earned badges until the user opens it. Read-only; it never awards anything.
 
 **Vote** — A named, admin-run event in which users pick their favourite costume for a category. Open until an admin ends it; then it is ended and its results are public.
 
@@ -64,4 +76,4 @@ _Avoid_: Poll (for the event), election
 
 **Leaderboard** — A bar graph ranking users, showing the top ten plus the viewer's own row. The clicker view ranks by click count; Add song to game, Spookify Tinder and Spookify FMK each rank by their own score.
 
-**Route** — The URL path of a view: `/admin`, `/clicker`, `/spooks`, `/karaoke`, `/poll`, `/users`, `/profile`, `/spookify/add`, `/spookify/tinder`, `/spookify/fmk`. Unknown paths go to `/clicker`. The host must serve `index.html` for unknown paths.
+**Route** — The URL path of a view: `/admin`, `/clicker`, `/spooks`, `/karaoke`, `/poll`, `/battlepass`, `/users`, `/profile`, `/spookify/add`, `/spookify/tinder`, `/spookify/fmk`. Unknown paths go to `/clicker`. The host must serve `index.html` for unknown paths.

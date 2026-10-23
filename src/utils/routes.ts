@@ -1,9 +1,11 @@
-export type View = 'clicker' | 'profile' | 'users' | 'spooks' | 'karaoke' | 'poll' | 'spookify' | 'admin'
+export type View = 'clicker' | 'profile' | 'users' | 'spooks' | 'karaoke' | 'poll' | 'battlepass' | 'spookify' | 'admin'
 export type SpookifyPanel = 'source' | 'tinder' | 'fmk'
 
 export type Route = { view: View; panel: SpookifyPanel }
 
-const VIEWS: readonly View[] = ['clicker', 'profile', 'users', 'spooks', 'karaoke', 'poll', 'spookify', 'admin']
+const VIEWS: readonly View[] = [
+  'clicker', 'profile', 'users', 'spooks', 'karaoke', 'poll', 'battlepass', 'spookify', 'admin',
+]
 
 // The "source" panel lives at /spookify/add.
 const PANEL_SEGMENTS: Record<SpookifyPanel, string> = { source: 'add', tinder: 'tinder', fmk: 'fmk' }

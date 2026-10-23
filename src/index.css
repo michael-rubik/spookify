@@ -403,8 +403,26 @@ select:focus-visible {
 }
 
 .bottom-nav-icon {
+  position: relative;
   font-size: 1.3rem;
   line-height: 1;
+}
+
+.nav-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-left: 0.3rem;
+  border-radius: 50%;
+  background: #ff5a36;
+  vertical-align: middle;
+}
+
+.bottom-nav-icon .nav-dot {
+  position: absolute;
+  top: -0.1rem;
+  right: -0.4rem;
+  margin: 0;
 }
 
 /* --------------------------------------------------------------- sections */

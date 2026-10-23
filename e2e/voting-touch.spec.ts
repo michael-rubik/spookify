@@ -22,6 +22,8 @@ test('mobile account menu and tab bar reach every view', async ({ page }) => {
   await tabs.getByRole('button', { name: 'Spooks' }).tap()
   await expect(page).toHaveURL(/\/spooks/)
 
+  await tabs.getByRole('button', { name: 'Pass' }).tap()
+  await expect(page).toHaveURL(/\/battlepass/)
   const account = page.getByRole('button', { name: 'Account' })
   await account.tap()
   await expect(account).toHaveAttribute('aria-expanded', 'true')
@@ -34,7 +36,7 @@ test('mobile account menu and tab bar reach every view', async ({ page }) => {
   await expect(page).toHaveURL(/\/profile/)
 
   await page.getByRole('button', { name: 'Spookify', exact: true }).first().tap()
-  await expect(page).toHaveURL(/\/$/)
+  await expect(page).toHaveURL(/\/clicker/)
 })
 
 test('tapping a live chart bar reveals the user and costume', async ({ page }) => {

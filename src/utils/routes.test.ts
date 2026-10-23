@@ -3,7 +3,7 @@ import { canonicalPath, parseRoute, pathFor } from './routes'
 
 describe('routes', () => {
   it('maps each view to its own path and back', () => {
-    for (const view of ['clicker', 'profile', 'users', 'spooks', 'karaoke', 'poll', 'admin'] as const) {
+    for (const view of ['clicker', 'profile', 'users', 'spooks', 'karaoke', 'poll', 'battlepass', 'admin'] as const) {
       expect(pathFor(view)).toBe(`/${view}`)
       expect(parseRoute(`/${view}`)).toEqual({ view, panel: 'source' })
     }
