@@ -70,6 +70,10 @@ function App() {
   const [profileError, setProfileError] = useState('')
   const [profileMessage, setProfileMessage] = useState('')
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
+  const [renamingUserId, setRenamingUserId] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
+  const [renameError, setRenameError] = useState('')
+  const [isRenaming, setIsRenaming] = useState(false)
   const [dismissedBadgeIds, setDismissedBadgeIds] = useState<string[]>([])
   const [badgeLabel, setBadgeLabel] = useState('')
   const [badgeRecipientIds, setBadgeRecipientIds] = useState<string[]>([])
@@ -318,6 +322,35 @@ function App() {
     setUsers((currentUsers) =>
       currentUsers.map((user) => (user.id === userId ? { ...user, is_admin: nextValue } : user)),
     )
+  }
+
+  const handleRenameUser = async (event: FormEvent<HTMLFormElement>, userId: string) => {
+    event.preventDefault()
+
+    const nextName = renameDraft.trim()
+
+    if (!isCurrentUserAdmin || !nextName) {
+      setRenameError('Name cannot be empty.')
+      return
+    }
+
+    setIsRenaming(true)
+    setRenameError('')
+
+    const { error } = await supabase.from('users').update({ name: nextName }).eq('id', userId)
+
+    setIsRenaming(false)
+
+    if (error) {
+      console.error('Failed to rename user:', error)
+      setRenameError('Could not rename user.')
+      return
+    }
+
+    setUsers((currentUsers) =>
+      currentUsers.map((user) => (user.id === userId ? { ...user, name: nextName } : user)),
+    )
+    setRenamingUserId(null)
   }
 
   const handleRefreshBadges = async () => {
@@ -771,9 +804,29 @@ function App() {
                             {user.name.slice(0, 1).toUpperCase()}
                           </span>
                         )}
-                        <strong>{user.name}</strong>
+                        {renamingUserId === user.id ? (
+                          <form className="row" onSubmit={(event) => handleRenameUser(event, user.id)}>
+                            <input
+                              aria-label={`Name for ${user.name}`}
+                              value={renameDraft}
+                              onChange={(event) => setRenameDraft(event.target.value)}
+                              autoFocus
+                            />
+                            <button type="submit" disabled={isRenaming}>
+                              {isRenaming ? 'Saving...' : 'Save'}
+                            </button>
+                            <button type="button" disabled={isRenaming} onClick={() => setRenamingUserId(null)}>
+                              Cancel
+                            </button>
+                          </form>
+                        ) : (
+                          <strong>{user.name}</strong>
+                        )}
                         {user.deletion_pending_at && <span className="pill">Deletion pending</span>}
                       </div>
+                      {renamingUserId === user.id && renameError && (
+                        <p role="alert" className="form-error">{renameError}</p>
+                      )}
                       {showAllDetails && (
                         <span className={`pill${user.is_admin ? ' pill--admin' : ''}`}>
                           {user.is_admin ? 'Admin' : 'Member'}
@@ -804,6 +857,19 @@ function App() {
                             onChange={() => handleToggleAdmin(user.id, user.is_admin)}
                           />
                         </div>
+
+                        {!user.deletion_pending_at && renamingUserId !== user.id && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRenamingUserId(user.id)
+                              setRenameDraft(user.name)
+                              setRenameError('')
+                            }}
+                          >
+                            Edit name
+                          </button>
+                        )}
 
                         {user.id !== session.user.id && (
                           <button type="button" disabled={deletingUserId !== null} onClick={() => handleDeleteUser(user.id)}>
