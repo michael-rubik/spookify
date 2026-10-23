@@ -10,6 +10,33 @@ test.afterAll(() => {
   expect(voteTraces()).toBe(NO_TRACES)
 })
 
+test('mobile account menu and tab bar reach every view', async ({ page }) => {
+  await page.addInitScript(
+    ([key, value]) => window.localStorage.setItem(key, value),
+    [AUTH_STORAGE_KEY, JSON.stringify(sessionFor(ann))],
+  )
+  await page.goto('/')
+
+  const tabs = page.getByRole('navigation', { name: 'Primary' })
+  await expect(tabs.getByRole('button', { name: 'Clicker' })).toHaveCount(0)
+  await tabs.getByRole('button', { name: 'Spooks' }).tap()
+  await expect(page).toHaveURL(/\/spooks/)
+
+  const account = page.getByRole('button', { name: 'Account' })
+  await account.tap()
+  await expect(account).toHaveAttribute('aria-expanded', 'true')
+  await page.getByRole('menuitem', { name: 'Users' }).tap()
+  await expect(page).toHaveURL(/\/users/)
+  await expect(page.getByRole('menu')).toHaveCount(0)
+
+  await account.tap()
+  await page.getByRole('menuitem', { name: 'Profile' }).tap()
+  await expect(page).toHaveURL(/\/profile/)
+
+  await page.getByRole('button', { name: 'Spookify', exact: true }).first().tap()
+  await expect(page).toHaveURL(/\/$/)
+})
+
 test('tapping a live chart bar reveals the user and costume', async ({ page }) => {
   sql(`
     with v as (insert into public.votes (category) values ('Scariest') returning id)

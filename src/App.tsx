@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, ChangeEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './utils/supabase/supabase-client'
+import { AccountMenu } from './components/account-menu'
 import { Auth } from './components/auth'
 import { Clicker } from './components/clicker'
 import { Karaoke } from './components/karaoke'
@@ -506,13 +507,11 @@ function App() {
   }
 
   const navItems: { key: View; label: string; icon: string }[] = [
-    { key: 'clicker', label: 'Clicker', icon: '👻' },
     { key: 'spooks', label: 'Spooks', icon: '🎃' },
     { key: 'karaoke', label: 'Karaoke', icon: '🎤' },
     ...(isDevLoginEnabled() ? [] : [{ key: 'spookify' as const, label: 'Spookify', icon: '🎧' }]),
     ...(hasVotes ? [{ key: 'poll' as const, label: 'Poll', icon: '🗳️' }] : []),
-    { key: 'users', label: 'Users', icon: '🧟' },
-    { key: 'profile', label: 'Profile', icon: '🎭' },
+    ...(isCurrentUserAdmin ? [{ key: 'admin' as const, label: 'Admin', icon: '🛡️' }] : []),
   ]
 
   return (
@@ -590,6 +589,14 @@ function App() {
               Logout
             </button>
           </nav>
+
+          <AccountMenu
+            name={currentUser?.name ?? null}
+            avatarUrl={currentUser?.avatar_url ?? null}
+            view={view}
+            onNavigate={setView}
+            onLogout={handleLogout}
+          />
         </header>
       )}
 
@@ -935,7 +942,7 @@ function App() {
 
             <div className="row profile-actions">
               {isCurrentUserAdmin && (
-                <button type="button" className="nav-button nav-button--admin" onClick={() => setView('admin')}>
+                <button type="button" className="nav-button nav-button--admin profile-admin-link" onClick={() => setView('admin')}>
                   Admin panel
                 </button>
               )}
