@@ -5,6 +5,7 @@ import { usePolling } from '../utils/use-polling'
 import './battle-pass.css'
 
 type BattlePassProps = {
+  userId: string
   badges: string[]
   progress: Record<string, number>
 }
@@ -13,7 +14,7 @@ type WonVote = { vote_id: string; category: string; points: number }
 
 type VoteWinnerRow = { vote_id: string; votes: { category: string; winner_points: number } | null }
 
-export const BattlePass = ({ badges, progress }: BattlePassProps) => {
+export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
   const [points, setPoints] = useState<PointsById>({})
   const [customPoints, setCustomPoints] = useState<Record<string, number>>({})
   const [wonVotes, setWonVotes] = useState<WonVote[]>([])
@@ -23,7 +24,7 @@ export const BattlePass = ({ badges, progress }: BattlePassProps) => {
     const [pointsResult, customResult, winnersResult] = await Promise.all([
       supabase.from('badge_points').select('badge_id, points'),
       supabase.from('custom_badge_points').select('label, points'),
-      supabase.from('vote_winners').select('vote_id, votes(category, winner_points)'),
+      supabase.from('vote_winners').select('vote_id, votes(category, winner_points)').eq('user_id', userId),
     ])
     if (isCancelled()) return
 

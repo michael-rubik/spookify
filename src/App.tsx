@@ -732,7 +732,7 @@ function App() {
           onProgress={(nextCount, nextBadges) => updateUserProgress(session.user.id, nextCount, nextBadges)}
         />
       ) : view === 'battlepass' ? (
-        <BattlePass badges={currentUser?.badges ?? []} progress={badgeProgress} />
+        <BattlePass userId={session.user.id} badges={currentUser?.badges ?? []} progress={badgeProgress} />
       ) : view === 'admin' ? (
         <section className="page-section">
           <h2>Admin Panel</h2>

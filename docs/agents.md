@@ -10,6 +10,8 @@ React 19 + Vite + TypeScript + Supabase app for a Halloween party: clicker game,
 
 Before calling work done: `npm run build`, `npm test`, `npm run lint` (scripts live in `package.json`). Never start a dev server in a background terminal — the user runs it.
 
+The Playwright e2e suite (`e2e/`) can't run on this machine (it needs podman), so CI is the only check. When a change touches a view or its text/test ids, update the specs, and after pushing check the run with `gh run list --workflow e2e.yml --limit 1` and `gh run view <id> --log-failed`. Queries that feed per-user UI (badges, XP, wins) must filter by the signed-in user, because most read policies expose every user's rows.
+
 ### Conventions
 
 - **Supabase**: the SQL files in `supabase/` are the source of truth — follow the database workflow in [README.md](../README.md). Migrations are named `YYYYMMDD_snake_case.sql`.
