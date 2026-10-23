@@ -237,10 +237,9 @@ function App() {
 
     const nextName = profileDraft.name.trim()
     const nextCostume = profileDraft.costume.trim()
-    const nextEmail = profileDraft.email.trim()
 
-    if (!nextName || !nextCostume || !nextEmail) {
-      setProfileError('Please fill in your name, costume, and email.')
+    if (!nextName || !nextCostume) {
+      setProfileError('Please fill in your name and costume.')
       return
     }
 
@@ -249,20 +248,11 @@ function App() {
     setProfileMessage('')
 
     try {
-      if (nextEmail !== (currentUser?.email ?? session.user.email ?? '')) {
-        const { error: authUpdateError } = await supabase.auth.updateUser({ email: nextEmail })
-
-        if (authUpdateError) {
-          console.warn('Could not update auth email:', authUpdateError)
-        }
-      }
-
       const { data, error } = await supabase
         .from('users')
         .update({
           name: nextName,
           costume: nextCostume,
-          email: nextEmail,
         })
         .eq('id', session.user.id)
         .select()
@@ -281,13 +271,12 @@ function App() {
                 ...user,
                 name: savedUser?.name ?? nextName,
                 costume: savedUser?.costume ?? nextCostume,
-                email: savedUser?.email ?? nextEmail,
               }
             : user,
         ),
       )
 
-      setProfileDraft({ name: nextName, costume: nextCostume, email: nextEmail })
+      setProfileDraft((current) => ({ ...current, name: nextName, costume: nextCostume }))
       setProfileMessage('Profile saved successfully.')
     } catch (error) {
       console.error('Failed to save profile:', error)
@@ -1059,16 +1048,7 @@ function App() {
                 id="profile-email"
                 type="email"
                 value={profileDraft.email}
-                onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                  setProfileDraft((current) => ({ ...current, email: event.target.value }))
-                  if (profileError) {
-                    setProfileError('')
-                  }
-                  if (profileMessage) {
-                    setProfileMessage('')
-                  }
-                }}
-                placeholder="Your email"
+                readOnly
               />
 
               {profileError && <p role="alert" className="form-error">{profileError}</p>}

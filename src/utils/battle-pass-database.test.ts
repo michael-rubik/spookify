@@ -15,6 +15,7 @@ const migrations = [
   'supabase/migrations/20261032_spookify_song_points.sql',
   'supabase/migrations/20261033_songmaster_badge.sql',
   'supabase/migrations/20261034_battle_pass.sql',
+  'supabase/migrations/20261035_lock_progress_and_email.sql',
 ].map((path) => readFileSync(path, 'utf8'))
 
 const REGULAR = ['clicker', 'songmaster', 'spooker', 'tagged', 'fan', 'karaoke', 'swipes', 'fmk', 'voter']
@@ -105,6 +106,46 @@ describe.each([
     await db.exec('reset role')
     const { rows } = await db.query<{ badge_id: string }>('select badge_id from public.badge_points')
     expect(rows.map((row) => row.badge_id).sort()).toEqual([...REGULAR, 'winner-winner'].sort())
+  })
+
+  it('stops users editing their own badges, clicks and email, while admins still can', async () => {
+    await asUser(ann)
+    for (const sql of [
+      "update public.users set badges = array['clicker'] where id = $1",
+      'update public.users set click_count = 999 where id = $1',
+      "update public.users set email = 'new@example.com' where id = $1",
+    ]) {
+      await expect(db.query(sql, [ann])).rejects.toThrow(/server|Only admins/)
+    }
+    await db.query("update public.users set name = 'Renamed' where id = $1", [ann])
+
+    await asUser(admin)
+    await db.query("update public.users set badges = array['custom:Hi'], click_count = 3 where id = $1", [ann])
+    await db.query("update public.users set email = 'admin-set@example.com' where id = $1", [ann])
+    expect(await badgesOf(ann)).toEqual(['custom:Hi'])
+  })
+
+  it('registers clicks through the server with a rate cap and awards the clicker badge', async () => {
+    await asUser(ann)
+    const first = await db.query<{ register_clicks: number }>('select public.register_clicks(500)')
+    expect(first.rows[0].register_clicks).toBe(20)
+    const second = await db.query<{ register_clicks: number }>('select public.register_clicks(5)')
+    expect(second.rows[0].register_clicks).toBe(25)
+
+    await db.exec('reset role')
+    await db.query("update public.users set click_count = 495, clicks_flushed_at = now() - interval '60 seconds' where id = $1", [ann])
+    await asUser(ann)
+    const third = await db.query<{ register_clicks: number }>('select public.register_clicks(10)')
+    expect(third.rows[0].register_clicks).toBe(505)
+    await db.query('select * from public.my_badge_progress()')
+    expect(await badgesOf(ann)).toContain('clicker')
+  })
+
+  it('does not let new accounts start with badges or clicks', async () => {
+    await asUser(ben)
+    await expect(
+      db.query("insert into public.users (id, name, costume, email, badges) values (gen_random_uuid(), 'x', 'y', 'z@example.com', array['clicker'])"),
+    ).rejects.toThrow()
   })
 
   it('awards a badge at its goal and not before, keeping other badges', async () => {

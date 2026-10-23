@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { grantBadges } from '../utils/badges'
 import { supabase } from '../utils/supabase/supabase-client'
 import { Leaderboard } from './leaderboard'
@@ -6,6 +6,8 @@ import './clicker.css'
 
 // From this many clicks on, the button hops to a random spot on every click.
 const JUMP_AFTER_CLICKS = 250
+// Clicks are sent to the server in batches rather than one request per tap.
+const FLUSH_DELAY_MS = 1000
 
 type ClickerProps = {
   userId: string
@@ -15,39 +17,55 @@ type ClickerProps = {
 }
 
 export const Clicker = ({ userId, clickCount, badges, onProgress }: ClickerProps) => {
-  const [count, setCount] = useState(clickCount)
-  const [isUpdating, setIsUpdating] = useState(false)
+  // Clicks not yet confirmed by the server; the shown count is the saved count plus these.
+  const [pending, setPending] = useState(0)
   const [spot, setSpot] = useState({ x: 0.5, y: 0.5 })
+  const unsent = useRef(0)
+  const timer = useRef<number | null>(null)
+  const latest = useRef({ badges, onProgress })
 
-  const [prevClickCount, setPrevClickCount] = useState(clickCount)
-  if (prevClickCount !== clickCount) {
-    setPrevClickCount(clickCount)
-    setCount(clickCount)
-  }
+  useEffect(() => {
+    latest.current = { badges, onProgress }
+  })
 
-  const handleClick = async () => {
-    const nextCount = count + 1
-    const previousCount = count
-    const previousBadges = badges
-    const nextBadges = grantBadges(nextCount, badges)
+  const flush = useCallback(async () => {
+    const batch = unsent.current
+    if (!batch) return
+    unsent.current = 0
 
-    setCount(nextCount)
-    if (nextCount >= JUMP_AFTER_CLICKS) setSpot({ x: Math.random(), y: Math.random() })
-    onProgress?.(nextCount, nextBadges)
-    setIsUpdating(true)
-
-    const { error } = await supabase
-      .from('users')
-      .update({ click_count: nextCount, badges: nextBadges })
-      .eq('id', userId)
+    const { data, error } = await supabase.rpc('register_clicks', { p_count: batch })
 
     if (error) {
-      console.error('Failed to save click count:', error)
-      setCount(previousCount)
-      onProgress?.(previousCount, previousBadges)
+      console.error('Failed to save clicks:', error)
+      unsent.current += batch
+      return
     }
 
-    setIsUpdating(false)
+    const saved = Number(data)
+    setPending((current) => current - batch)
+    latest.current.onProgress?.(saved, grantBadges(saved, latest.current.badges))
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (timer.current !== null) window.clearTimeout(timer.current)
+      void flush()
+    },
+    [flush],
+  )
+
+  const count = clickCount + pending
+
+  const handleClick = () => {
+    unsent.current += 1
+    setPending((current) => current + 1)
+    if (count + 1 >= JUMP_AFTER_CLICKS) setSpot({ x: Math.random(), y: Math.random() })
+    if (timer.current === null) {
+      timer.current = window.setTimeout(() => {
+        timer.current = null
+        void flush()
+      }, FLUSH_DELAY_MS)
+    }
   }
 
   const isJumping = count >= JUMP_AFTER_CLICKS
@@ -62,9 +80,8 @@ export const Clicker = ({ userId, clickCount, badges, onProgress }: ClickerProps
           className="clicker-button"
           style={isJumping ? { left: `calc((100% - 8rem) * ${spot.x})`, top: `calc((100% - 3rem) * ${spot.y})` } : undefined}
           onClick={handleClick}
-          disabled={isUpdating}
         >
-          {isUpdating ? 'Saving...' : 'Click me'}
+          Click me
         </button>
       </div>
       <Leaderboard userId={userId} column="click_count" label="Click" ownValue={count} />

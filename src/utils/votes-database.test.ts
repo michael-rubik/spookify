@@ -10,6 +10,7 @@ const migrations = [
   'supabase/migrations/20261027_add_signup_codes.sql',
   'supabase/migrations/20261028_add_votes.sql',
   'supabase/migrations/20261034_battle_pass.sql',
+  'supabase/migrations/20261035_lock_progress_and_email.sql',
 ].map((path) => readFileSync(path, 'utf8'))
 
 describe.each([
