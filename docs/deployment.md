@@ -2,6 +2,11 @@
 
 Build the app and serve the static `dist/` output from your hosting provider. Use `npm run build` to produce `dist/`.
 
+Routes such as `/spooks` or `/spookify/tinder` are real paths (History API), so the host must answer every
+unknown path with `index.html` (a single-page-app fallback); otherwise a pasted or reloaded link shows the host's
+"page not found". `public/_redirects` covers Netlify and Cloudflare Pages, and `vercel.json` covers Vercel. On any
+other host, add the equivalent rewrite (for nginx: `try_files $uri /index.html;`).
+
 Follow the repository's GitHub Actions workflows in `.github/workflows/` for automated migrations.
 
 The `supabase` workflow applies migrations, then deploys the `delete-account` and
