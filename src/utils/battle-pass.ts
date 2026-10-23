@@ -123,6 +123,55 @@ export type PassLevel = { id: string; xp_required: number; bonus_songs: number }
 export const MAX_LEVEL_XP = 100000
 export const MAX_LEVEL_BONUS_SONGS = 100
 
+// The bar ends at the larger of the badge total and the highest milestone, so no reward icon falls off it.
+export const passScale = (trackTotal: number, levels: readonly PassLevel[]): number =>
+  Math.max(trackTotal, ...levels.map((entry) => entry.xp_required), 1)
+
+// Icons closer than this share of the bar width merge into one group (about 24px on a phone).
+export const REWARD_GROUP_GAP_PERCENT = 7
+
+export type RewardGroup = {
+  key: string
+  positionPercent: number
+  bonusSongs: number
+  milestones: PassLevel[]
+  reachedCount: number
+}
+
+export function rewardGroups(levels: readonly PassLevel[], xp: number, scale: number): RewardGroup[] {
+  const sorted = [...levels].sort((a, b) => a.xp_required - b.xp_required)
+  const percentOf = (entry: PassLevel) => Math.min(100, (entry.xp_required / scale) * 100)
+  const groups: PassLevel[][] = []
+  for (const entry of sorted) {
+    const current = groups[groups.length - 1]
+    if (current && percentOf(entry) - percentOf(current[current.length - 1]) < REWARD_GROUP_GAP_PERCENT) {
+      current.push(entry)
+    } else {
+      groups.push([entry])
+    }
+  }
+
+  return groups.map((milestones) => ({
+    key: milestones.map((entry) => entry.id).join('+'),
+    positionPercent: percentOf(milestones[0]),
+    bonusSongs: milestones.reduce((sum, entry) => sum + entry.bonus_songs, 0),
+    milestones,
+    reachedCount: milestones.filter((entry) => entry.xp_required <= xp).length,
+  }))
+}
+
+export function describeRewardGroup(group: RewardGroup): string {
+  const songs = `+${group.bonusSongs} ${group.bonusSongs === 1 ? 'song' : 'songs'} per day`
+  const { milestones, reachedCount } = group
+  if (reachedCount === milestones.length) return `${songs} · Unlocked`
+  if (reachedCount === 0) {
+    const first = milestones[0].xp_required
+    const last = milestones[milestones.length - 1].xp_required
+    return `${songs} · Unlocked at ${first === last ? first : `${first}–${last}`} XP`
+  }
+  return `${songs} · ${reachedCount} of ${milestones.length} unlocked, next at ${milestones[reachedCount].xp_required} XP`
+}
+
 export type LevelStatus = {
   level: number
   bonusSongs: number

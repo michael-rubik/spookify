@@ -4,7 +4,10 @@ import {
   computeXp,
   customLabelOf,
   DEFAULT_CUSTOM_POINTS,
+  describeRewardGroup,
   levelStatus,
+  passScale,
+  rewardGroups,
   type PassLevel,
   type PointsById,
 } from '../utils/battle-pass'
@@ -27,6 +30,7 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
   const [customPoints, setCustomPoints] = useState<Record<string, number>>({})
   const [wonVotes, setWonVotes] = useState<WonVote[]>([])
   const [levels, setLevels] = useState<PassLevel[]>([])
+  const [activeReward, setActiveReward] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   usePolling(async (isCancelled) => {
@@ -66,8 +70,10 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
     customPoints,
     voteWinnerPoints: wonVotes.map((vote) => vote.points),
   })
-  const fill = trackTotal > 0 ? Math.min(100, (xp / trackTotal) * 100) : 0
+  const scale = passScale(trackTotal, levels)
+  const fill = Math.min(100, (xp / scale) * 100)
   const { level, bonusSongs, next } = levelStatus(xp, levels)
+  const groups = rewardGroups(levels, xp, scale)
   const customLabels = badges.flatMap((id) => {
     const label = customLabelOf(id)
     return label ? [label] : []
@@ -86,23 +92,58 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
       <div className="card battle-pass-xp">
         <div className="row row--between">
           <strong data-testid="pass-xp">{xp} XP</strong>
-          <span className="muted">of {trackTotal} on the track</span>
+          <span className="muted">of {scale} on the track</span>
         </div>
-        <div
-          className="battle-pass-bar"
-          role="progressbar"
-          aria-label="Battle pass XP"
-          aria-valuemin={0}
-          aria-valuemax={trackTotal}
-          aria-valuenow={Math.min(xp, trackTotal)}
-        >
-          <div className="battle-pass-bar-fill" style={{ width: `${fill}%` }} />
+        <div className="battle-pass-bar-wrap">
+          <div
+            className="battle-pass-bar"
+            role="progressbar"
+            aria-label="Battle pass XP"
+            aria-valuemin={0}
+            aria-valuemax={scale}
+            aria-valuenow={Math.min(xp, scale)}
+          >
+            <div className="battle-pass-bar-fill" style={{ width: `${fill}%` }} />
+          </div>
+          {groups.map((group) => {
+            const text = describeRewardGroup(group)
+            const state = group.reachedCount === group.milestones.length ? 'unlocked' : 'locked'
+            const edge = group.positionPercent < 20 ? ' is-start' : group.positionPercent > 80 ? ' is-end' : ''
+            return (
+              <span
+                key={group.key}
+                className="battle-pass-reward"
+                style={{ left: `${group.positionPercent}%` }}
+              >
+                <button
+                  type="button"
+                  className={`battle-pass-reward-icon is-${state}`}
+                  data-testid="pass-reward"
+                  data-state={state}
+                  aria-label={text}
+                  aria-expanded={activeReward === group.key}
+                  onMouseEnter={() => setActiveReward(group.key)}
+                  onMouseLeave={() => setActiveReward((current) => (current === group.key ? null : current))}
+                  onFocus={() => setActiveReward(group.key)}
+                  onBlur={() => setActiveReward((current) => (current === group.key ? null : current))}
+                  onClick={() => setActiveReward((current) => (current === group.key ? null : group.key))}
+                >
+                  🎵
+                </button>
+                {activeReward === group.key && (
+                  <span role="tooltip" className={`battle-pass-tooltip${edge}`} data-testid="pass-reward-tooltip">
+                    {text}
+                  </span>
+                )}
+              </span>
+            )
+          })}
         </div>
         <div className="row row--between" data-testid="pass-level">
           <strong>Level {level}</strong>
           <span className="muted">
             {bonusSongs > 0 ? `+${bonusSongs} bonus songs per day` : 'No bonus songs yet'}
-            {next ? ` · next level at ${next.xp_required} XP (+${next.bonus_songs})` : ''}
+            {next ? ` · next reward at ${next.xp_required} XP (+${next.bonus_songs})` : ''}
           </span>
         </div>
         <ul className="list" aria-label="XP breakdown" data-testid="pass-breakdown">

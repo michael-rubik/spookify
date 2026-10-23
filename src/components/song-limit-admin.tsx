@@ -30,7 +30,7 @@ const LevelRow = ({ level, position, disabled, onSave, onDelete }: LevelRowProps
 
   return (
     <li className="row row--between" data-testid="level-row">
-      <strong>Level {position}</strong>
+      <strong>Milestone {position}</strong>
       <label className="row">
         <span className="muted">XP</span>
         <input
@@ -38,20 +38,20 @@ const LevelRow = ({ level, position, disabled, onSave, onDelete }: LevelRowProps
           min={0}
           max={MAX_LEVEL_XP}
           disabled={disabled}
-          aria-label={`XP needed for level ${position}`}
+          aria-label={`XP needed for milestone ${position}`}
           value={xp ?? String(level.xp_required)}
           onChange={(event) => setXp(event.target.value)}
           onBlur={commit}
         />
       </label>
       <label className="row">
-        <span className="muted">Bonus songs</span>
+        <span className="muted">Reward: bonus songs</span>
         <input
           type="number"
           min={0}
           max={MAX_LEVEL_BONUS_SONGS}
           disabled={disabled}
-          aria-label={`Bonus songs for level ${position}`}
+          aria-label={`Reward (bonus songs) for milestone ${position}`}
           value={bonus ?? String(level.bonus_songs)}
           onChange={(event) => setBonus(event.target.value)}
           onBlur={commit}
@@ -81,7 +81,7 @@ export const SongLimitAdmin = () => {
     const { data, error: levelsError } = await fetchLevels()
     if (levelsError) {
       console.error('Failed to load levels:', levelsError)
-      setError('Could not load the battle pass levels.')
+      setError('Could not load the battle pass milestones.')
       return
     }
     setLevels((data ?? []) as PassLevel[])
@@ -117,7 +117,7 @@ export const SongLimitAdmin = () => {
     if (actionError) {
       console.error('Song limit action failed:', actionError)
       const duplicate = actionError.message.includes('duplicate key')
-      setError(duplicate ? 'Another level already needs that much XP.' : actionError.message || 'That action failed.')
+      setError(duplicate ? 'Another milestone already needs that much XP.' : actionError.message || 'That action failed.')
       await reloadLevels()
       return false
     }
@@ -152,7 +152,7 @@ export const SongLimitAdmin = () => {
     const bonus = Number(newBonus)
     if (!validLevel(xp, bonus)) return
 
-    if (await run(() => supabase.from('battle_pass_levels').insert({ xp_required: xp, bonus_songs: bonus }), 'Level added.')) {
+    if (await run(() => supabase.from('battle_pass_levels').insert({ xp_required: xp, bonus_songs: bonus }), 'Milestone added.')) {
       setNewXp('')
     }
   }
@@ -161,21 +161,20 @@ export const SongLimitAdmin = () => {
     if (!validLevel(xp, bonus)) return
     return run(
       () => supabase.from('battle_pass_levels').update({ xp_required: xp, bonus_songs: bonus }).eq('id', level.id),
-      'Level saved.',
+      'Milestone saved.',
     )
   }
 
   const handleDeleteLevel = (level: PassLevel) => {
-    if (!window.confirm(`Delete the level at ${level.xp_required} XP?`)) return
-    void run(() => supabase.from('battle_pass_levels').delete().eq('id', level.id), 'Level deleted.')
+    if (!window.confirm(`Delete the milestone at ${level.xp_required} XP?`)) return
+    void run(() => supabase.from('battle_pass_levels').delete().eq('id', level.id), 'Milestone deleted.')
   }
 
   return (
     <div className="card stack" data-testid="song-limit-admin">
       <h3>Song limit</h3>
       <p className="muted">
-        Songs each user may add to the Spookify pool per 24 hours: the base limit plus the bonus songs of every battle pass
-        level they have reached.
+        Songs each user may add to the Spookify pool per 24 hours: the base limit plus the bonus songs of every battle pass reward they have unlocked.
       </p>
       {error && (
         <p role="alert" className="form-error">
@@ -204,9 +203,9 @@ export const SongLimitAdmin = () => {
         </button>
       </form>
 
-      <h4 style={{ margin: 0 }}>Battle pass levels</h4>
+      <h4 style={{ margin: 0 }}>Battle pass milestones</h4>
       {levels.length > 0 && (
-        <ul className="list" aria-label="Battle pass levels">
+        <ul className="list" aria-label="Battle pass milestones">
           {levels.map((level, index) => (
             <LevelRow
               key={`${level.id}-${level.xp_required}-${level.bonus_songs}`}
@@ -230,7 +229,7 @@ export const SongLimitAdmin = () => {
           value={newXp}
           onChange={(event) => setNewXp(event.target.value)}
         />
-        <label htmlFor="new-level-bonus">Bonus songs</label>
+        <label htmlFor="new-level-bonus">Reward: bonus songs</label>
         <input
           id="new-level-bonus"
           type="number"
@@ -241,7 +240,7 @@ export const SongLimitAdmin = () => {
           onChange={(event) => setNewBonus(event.target.value)}
         />
         <button type="submit" disabled={isBusy}>
-          Add level
+          Add milestone
         </button>
       </form>
     </div>

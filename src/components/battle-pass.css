@@ -14,6 +14,66 @@
   height: 0.45rem;
 }
 
+.battle-pass-bar-wrap {
+  position: relative;
+  margin: 0.6rem 0.75rem;
+}
+
+.battle-pass-reward {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.battle-pass-reward-icon {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: var(--surface);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.battle-pass-reward-icon.is-locked {
+  border-color: var(--border);
+  opacity: 0.6;
+  filter: grayscale(1);
+}
+
+.battle-pass-tooltip {
+  position: absolute;
+  bottom: calc(100% + 0.4rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  width: max-content;
+  max-width: 14rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.battle-pass-tooltip.is-start {
+  left: 0;
+  transform: none;
+  text-align: left;
+}
+
+.battle-pass-tooltip.is-end {
+  left: auto;
+  right: 0;
+  transform: none;
+  text-align: right;
+}
+
 .battle-pass-bar-fill {
   height: 100%;
   border-radius: inherit;

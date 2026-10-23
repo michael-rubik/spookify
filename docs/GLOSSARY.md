@@ -24,7 +24,17 @@
 
 **Badge points** — The XP one badge is worth. Admins edit them per badge; defaults are 100, 200 or 300 for regular badges and 500 for Winner winner. A vote carries its own winner points (default 10, set by the admin) for its winner badge.
 
-**Battle pass** — The view showing every badge as a node on one XP track, ordered from cheapest to most valuable with Winner winner last. Earned nodes light up, open ones show progress, and a Collected strip shows custom and winner badges. A dot on its tab marks newly earned badges until the user opens it. Read-only; it never awards anything.
+**Battle pass** — The view showing every badge as a node on one XP track, ordered from cheapest to most valuable with Winner winner last. Earned nodes light up, open ones show progress, and a Collected strip shows custom and winner badges. The XP bar shows every reward as an icon at its milestone. A dot on its tab marks newly earned badges until the user opens it. Read-only; it never awards anything, rewards are derived from XP.
+
+**Milestone** — An XP threshold on the battle pass, set by admins. Each milestone carries one reward.
+
+**Reward** — The perk a milestone unlocks once a user's XP reaches it. Today the only kind is bonus songs. Badges are not rewards: they are achievements that give XP.
+
+**Level** — The number of milestones a user's XP has reached. Derived for display, never configured.
+
+**Bonus songs** — The extra songs per day a reward adds to the daily song limit. Bonus songs of all unlocked rewards stack.
+
+**Daily song limit** — How many songs a user may add to the pool in any rolling 24 hours: an admin-set base plus the bonus songs of every unlocked reward.
 
 **Vote** — A named, admin-run event in which users pick their favourite costume for a category. Open until an admin ends it; then it is ended and its results are public.
 

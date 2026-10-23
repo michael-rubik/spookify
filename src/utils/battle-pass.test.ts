@@ -8,6 +8,9 @@ import {
   computeXp,
   hasUnseenBadges,
   levelStatus,
+  describeRewardGroup,
+  passScale,
+  rewardGroups,
 } from './battle-pass'
 
 describe('battle pass catalog', () => {
@@ -42,6 +45,36 @@ describe('buildTrack', () => {
     expect(track.find((node) => node.badge.id === 'voter')?.earned).toBe(true)
     expect(track.find((node) => node.badge.id === 'clicker')?.progress).toBe(500)
     expect(track.find((node) => node.badge.id === 'tagged')?.progress).toBe(4)
+  })
+})
+
+describe('reward icons', () => {
+  const levels = [
+    { id: 'a', xp_required: 200, bonus_songs: 1 },
+    { id: 'b', xp_required: 220, bonus_songs: 2 },
+    { id: 'c', xp_required: 1000, bonus_songs: 1 },
+  ]
+
+  it('scales the bar to the highest milestone when it passes the track total', () => {
+    expect(passScale(2200, levels)).toBe(2200)
+    expect(passScale(500, levels)).toBe(1000)
+    expect(passScale(0, [])).toBe(1)
+  })
+
+  it('merges close milestones and keeps far ones apart', () => {
+    const groups = rewardGroups(levels, 0, 1000)
+    expect(groups.map((group) => group.bonusSongs)).toEqual([3, 1])
+    expect(groups[0].positionPercent).toBe(20)
+  })
+
+  it('describes locked, partial and unlocked rewards', () => {
+    const [near, far] = rewardGroups(levels, 0, 1000)
+    expect(describeRewardGroup(far)).toBe('+1 song per day · Unlocked at 1000 XP')
+    expect(describeRewardGroup(near)).toBe('+3 songs per day · Unlocked at 200–220 XP')
+    expect(describeRewardGroup(rewardGroups(levels, 200, 1000)[0])).toBe(
+      '+3 songs per day · 1 of 2 unlocked, next at 220 XP',
+    )
+    expect(describeRewardGroup(rewardGroups(levels, 1000, 1000)[1])).toBe('+1 song per day · Unlocked')
   })
 })
 
