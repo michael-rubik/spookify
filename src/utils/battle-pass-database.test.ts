@@ -17,6 +17,7 @@ const migrations = [
   'supabase/migrations/20261034_battle_pass.sql',
   'supabase/migrations/20261035_lock_progress_and_email.sql',
   'supabase/migrations/20261036_unique_costumes.sql',
+  'supabase/migrations/20261037_spooker_first_spook.sql',
 ].map((path) => readFileSync(path, 'utf8'))
 
 const REGULAR = ['clicker', 'songmaster', 'spooker', 'tagged', 'fan', 'karaoke', 'swipes', 'fmk', 'voter']
@@ -174,13 +175,12 @@ describe.each([
 
   it('awards a badge at its goal and not before, keeping other badges', async () => {
     await db.query("update public.users set badges = array['custom:Party MVP'] where id = $1", [ann])
-    await addSpooks(ann, 9)
-    expect((await progressOf(ann)).spooker).toBe(9)
+    await queueKaraoke(ann, 'completed', 2)
+    await queueKaraoke(ann, 'skipped', 5)
+    expect((await progressOf(ann)).spooker).toBe(0)
     expect(await badgesOf(ann)).toEqual(['custom:Party MVP'])
 
     await addSpooks(ann, 1)
-    await queueKaraoke(ann, 'completed', 2)
-    await queueKaraoke(ann, 'skipped', 5)
     await progressOf(ann)
     expect(await badgesOf(ann)).toEqual(['custom:Party MVP', 'spooker'])
 

@@ -10,7 +10,7 @@
 
 **Tag** — The link between a spook and a tagged user. A spook may have no tags.
 
-**Badge** — A reward a user earns when they meet that badge's condition: a click count threshold, a Spookify score of 100, 10 spooks posted, being tagged in 10 spooks, or 10 right swipes on a single song they added. Each badge has a badge message shown to the user. Once earned it is kept even if the condition later stops holding; an admin resetting clicks removes only the click badge. Tags on a user's own spooks do not count towards being tagged.
+**Badge** — A reward a user earns when they meet that badge's condition: a click count threshold, a Spookify score of 100, a spook posted, being tagged in 10 spooks, or 10 right swipes on a single song they added. Each badge has a badge message shown to the user. Once earned it is kept even if the condition later stops holding; an admin resetting clicks removes only the click badge. Tags on a user's own spooks do not count towards being tagged.
 
 **Badge message** — The text attached to a badge, visible only to its owner on the battle pass while the badge is held. Locked badges show only their goal and progress.
 

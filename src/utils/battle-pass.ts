@@ -19,7 +19,7 @@ const clickerMessage = BADGES[0].message
 export const PASS_BADGES: readonly PassBadge[] = [
   { id: 'clicker', title: 'Clicker', goal: 'Click 500 times', target: 500, message: clickerMessage, defaultPoints: 200 },
   { id: 'songmaster', title: 'Songmaster', goal: 'Collect 100 Spookify points', target: 100, message: SONGMASTER_BADGE.message, defaultPoints: 200 },
-  { id: 'spooker', title: 'Spooker', goal: 'Post 10 spooks', target: 10, message: 'Zehn Spooks! Der Feed gehört dir.', defaultPoints: 100 },
+  { id: 'spooker', title: 'Spooker', goal: 'Post your first spook', target: 1, message: 'Dein erster Spook! Der Feed gehört dir.', defaultPoints: 100 },
   { id: 'tagged', title: 'Popular', goal: 'Get tagged in 10 spooks by others', target: 10, message: 'Alle wollen dich auf ihren Fotos haben.', defaultPoints: 200 },
   { id: 'fan', title: 'Fan favourite', goal: 'Get 10 swipes right on one song you added', target: 10, message: 'Dein Song ist ein echter Hit.', defaultPoints: 300 },
   { id: 'karaoke', title: 'Karaoke star', goal: 'Perform 3 karaoke songs', target: 3, message: 'Das Mikrofon gehört dir.', defaultPoints: 100 },

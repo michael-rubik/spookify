@@ -36,11 +36,11 @@ describe('buildTrack', () => {
   })
 
   it('accumulates milestones, marks earned nodes and caps progress at the target', () => {
-    const track = buildTrack(['voter'], {}, { voter: 1, clicker: 9999, spooker: 4 })
+    const track = buildTrack(['voter'], {}, { voter: 1, clicker: 9999, tagged: 4 })
     expect(track.at(-1)?.milestone).toBe(2200)
     expect(track.find((node) => node.badge.id === 'voter')?.earned).toBe(true)
     expect(track.find((node) => node.badge.id === 'clicker')?.progress).toBe(500)
-    expect(track.find((node) => node.badge.id === 'spooker')?.progress).toBe(4)
+    expect(track.find((node) => node.badge.id === 'tagged')?.progress).toBe(4)
   })
 })
 
