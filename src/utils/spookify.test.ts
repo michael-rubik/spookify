@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DAILY_LIMIT_MESSAGE,
+  describeSongAllowance,
   describeSpookifyError,
   fmkAssignmentComplete,
   fmkSubmitterReward,
@@ -87,6 +88,18 @@ describe('markAlreadyAdded', () => {
       { track: track('a'), alreadyAdded: false },
       { track: track('b'), alreadyAdded: true },
     ])
+  })
+})
+
+describe('describeSongAllowance', () => {
+  it('shows what is left', () => {
+    expect(describeSongAllowance({ xp: 0, level: 0, daily_limit: 10, added_today: 4 })).toBe(
+      '6 of 10 songs left in the last 24 hours.',
+    )
+  })
+
+  it('explains when the limit is reached', () => {
+    expect(describeSongAllowance({ xp: 0, level: 0, daily_limit: 10, added_today: 10 })).toContain('Daily song limit reached (10 of 10)')
   })
 })
 

@@ -21,7 +21,16 @@ export const submitterReward = (direction: SwipeDirection): number => SUBMITTER_
 
 export const SONG_ALREADY_ADDED_MESSAGE = 'Song already added'
 
-export const DAILY_LIMIT_MESSAGE = 'You have reached the daily song limit. Try again later.'
+export const DAILY_LIMIT_MESSAGE =
+  'Daily song limit reached. Songs you added count for 24 hours; level up the battle pass for more.'
+
+export type SongAllowance = { xp: number; level: number; daily_limit: number; added_today: number }
+
+export function describeSongAllowance({ daily_limit, added_today }: SongAllowance): string {
+  const left = Math.max(0, daily_limit - added_today)
+  if (left === 0) return `Daily song limit reached (${added_today} of ${daily_limit}). Songs you added count for 24 hours; level up the battle pass for more.`
+  return `${left} of ${daily_limit} songs left in the last 24 hours.`
+}
 
 export type FmkChoice = 'sing' | 'listen' | 'delete'
 

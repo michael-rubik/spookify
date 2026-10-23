@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { supabase } from '../utils/supabase/supabase-client'
 import {
+  describeSongAllowance,
   describeSpookifyError,
   fmkAssignmentComplete,
   FMK_CHOICES,
@@ -11,6 +12,7 @@ import {
   type FmkChoice,
   type FmkSong,
   type SearchResult,
+  type SongAllowance,
   type SpookifySong,
   type SpookifyTrack,
   type SwipeDirection,
@@ -71,11 +73,13 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
   const [addingTrackId, setAddingTrackId] = useState<string | null>(null)
   const [sourceError, setSourceError] = useState('')
   const [sourceMessage, setSourceMessage] = useState('')
+  const [allowance, setAllowance] = useState<SongAllowance | null>(null)
   const [pooledTrackIds, setPooledTrackIds] = useState<string[]>([])
   const [searchFields, setSearchFields] = useState<SearchField[]>(['title', 'artist'])
   const [lastSearch, setLastSearch] = useState<SearchRequest | null>(null)
   const [searchOffset, setSearchOffset] = useState(0)
   const [hasMore, setHasMore] = useState(false)
+  const limitReached = allowance !== null && allowance.added_today >= allowance.daily_limit
 
   const [song, setSong] = useState<SpookifySong | null>(null)
   const [isLoadingSong, setIsLoadingSong] = useState(true)
@@ -92,7 +96,25 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
 
   const reloadRef = useRef<() => Promise<void>>(async () => {})
   const reloadFmkRef = useRef<() => Promise<void>>(async () => {})
+  const reloadAllowanceRef = useRef<() => Promise<void>>(async () => {})
   const dragStart = useRef<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadAllowance = async () => {
+      const { data, error } = await supabase.rpc('my_song_allowance')
+      if (cancelled) return
+      const row = ((data ?? []) as SongAllowance[])[0]
+      setAllowance(error || !row ? null : row)
+    }
+
+    reloadAllowanceRef.current = loadAllowance
+    void loadAllowance()
+    return () => {
+      cancelled = true
+    }
+  }, [currentUserId])
 
   useEffect(() => {
     let cancelled = false
@@ -213,12 +235,14 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
       const message = describeSpookifyError(error)
       setSourceError(message)
       if (message === SONG_ALREADY_ADDED_MESSAGE) markPooled(track.spotify_track_id)
+      void reloadAllowanceRef.current()
       return
     }
 
     markPooled(track.spotify_track_id)
     setSourceMessage(`Added "${track.title}" to the pool.`)
     refreshScores()
+    void reloadAllowanceRef.current()
     await reloadRef.current()
   }
 
@@ -368,6 +392,15 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
             ))}
           </div>
 
+          {allowance && (
+            <p
+              className={limitReached ? 'form-error' : 'muted'}
+              data-testid="song-allowance"
+              role={limitReached ? 'alert' : undefined}
+            >
+              {describeSongAllowance(allowance)}
+            </p>
+          )}
           {sourceError && <p role="alert" className="form-error">{sourceError}</p>}
           {sourceMessage && <p role="status" className="form-success">{sourceMessage}</p>}
 
@@ -381,7 +414,7 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
                 </span>
                 <button
                   type="button"
-                  disabled={alreadyAdded || addingTrackId === track.spotify_track_id}
+                  disabled={alreadyAdded || limitReached || addingTrackId === track.spotify_track_id}
                   onClick={() => void handleAdd(track)}
                 >
                   {alreadyAdded
