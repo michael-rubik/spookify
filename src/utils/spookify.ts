@@ -21,6 +21,8 @@ export const submitterReward = (direction: SwipeDirection): number => SUBMITTER_
 
 export const SONG_ALREADY_ADDED_MESSAGE = 'Song already added'
 
+export const DAILY_LIMIT_MESSAGE = 'You have reached the daily song limit. Try again later.'
+
 export type FmkChoice = 'sing' | 'listen' | 'delete'
 
 export type FmkSong = SpookifySong & { tier: number }
@@ -69,6 +71,7 @@ export function markAlreadyAdded(
 export function describeSpookifyError(error: { message?: string | null } | null | undefined): string {
   const message = error?.message ?? ''
   if (message.includes('Song already added')) return SONG_ALREADY_ADDED_MESSAGE
+  if (message.includes('Daily song limit')) return DAILY_LIMIT_MESSAGE
   if (message.includes('already swiped')) return 'You have already swiped on this song.'
   if (message.includes('choose your own')) return 'You cannot choose your own song.'
   if (message.includes('your own song')) return 'You cannot swipe on your own song.'

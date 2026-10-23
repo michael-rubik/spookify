@@ -7,6 +7,7 @@ import {
   clampPoints,
   computeXp,
   hasUnseenBadges,
+  levelStatus,
 } from './battle-pass'
 
 describe('battle pass catalog', () => {
@@ -44,6 +45,26 @@ describe('buildTrack', () => {
   })
 })
 
+describe('levelStatus', () => {
+  const levels = [
+    { id: 'b', xp_required: 500, bonus_songs: 2 },
+    { id: 'a', xp_required: 200, bonus_songs: 1 },
+    { id: 'c', xp_required: 1000, bonus_songs: 3 },
+  ]
+
+  it('is level 0 with no bonus below the first threshold', () => {
+    expect(levelStatus(199, levels)).toEqual({ level: 0, bonusSongs: 0, next: levels[1] })
+  })
+
+  it('stacks bonuses of every reached level, whatever the input order', () => {
+    expect(levelStatus(500, levels)).toEqual({ level: 2, bonusSongs: 3, next: levels[2] })
+  })
+
+  it('has no next level at the top', () => {
+    expect(levelStatus(5000, levels)).toEqual({ level: 3, bonusSongs: 6, next: null })
+  })
+})
+
 describe('computeXp', () => {
   const base = { points: {}, customPoints: {}, voteWinnerPoints: [] }
 
@@ -60,6 +81,12 @@ describe('computeXp', () => {
       voteWinnerPoints: [10, 40],
     })
     expect(summary.xp).toBe(25 + 10 + 50)
+    expect(summary.breakdown).toEqual({ badges: 0, custom: 35, votes: 50 })
+  })
+
+  it('splits xp by source', () => {
+    expect(computeXp({ ...base, heldIds: ['voter'], voteWinnerPoints: [5] }).breakdown)
+      .toEqual({ badges: 100, custom: 0, votes: 5 })
   })
 
   it('reports the track total including Winner winner', () => {

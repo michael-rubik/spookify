@@ -87,7 +87,12 @@ export type XpInput = {
   voteWinnerPoints: readonly number[]
 }
 
-export type XpSummary = { xp: number; trackTotal: number }
+export type XpSummary = {
+  xp: number
+  trackTotal: number
+  // xp split by source: track badges, custom badges, vote wins
+  breakdown: { badges: number; custom: number; votes: number }
+}
 
 export const customLabelOf = (id: string): string | null =>
   id.startsWith('custom:') ? id.slice('custom:'.length).trim() || null : null
@@ -95,22 +100,45 @@ export const customLabelOf = (id: string): string | null =>
 // XP is always derived from the current point values, so an admin edit corrects everyone at once.
 export function computeXp({ heldIds, points, customPoints, voteWinnerPoints }: XpInput): XpSummary {
   const held = new Set(heldIds ?? [])
-  let xp = 0
+  let badges = 0
+  let custom = 0
   for (const badge of ALL_PASS_BADGES) {
-    if (held.has(badge.id)) xp += pointsFor(badge, points)
+    if (held.has(badge.id)) badges += pointsFor(badge, points)
   }
   for (const id of held) {
     const label = customLabelOf(id)
-    if (label) xp += customPoints[label] ?? DEFAULT_CUSTOM_POINTS
+    if (label) custom += customPoints[label] ?? DEFAULT_CUSTOM_POINTS
   }
-  for (const won of voteWinnerPoints) xp += won
+  const votes = voteWinnerPoints.reduce((sum, won) => sum + won, 0)
 
   const trackTotal = ALL_PASS_BADGES.reduce((sum, badge) => sum + pointsFor(badge, points), 0)
-  return { xp, trackTotal }
+  return { xp: badges + custom + votes, trackTotal, breakdown: { badges, custom, votes } }
 }
 
 export const clampPoints = (value: number): number =>
   Number.isFinite(value) ? Math.min(MAX_BADGE_POINTS, Math.max(0, Math.trunc(value))) : 0
+
+export type PassLevel = { id: string; xp_required: number; bonus_songs: number }
+
+export const MAX_LEVEL_XP = 100000
+export const MAX_LEVEL_BONUS_SONGS = 100
+
+export type LevelStatus = {
+  level: number
+  bonusSongs: number
+  next: PassLevel | null
+}
+
+// Level 1 is the lowest XP threshold; a level's bonus songs stack with every level below it.
+export function levelStatus(xp: number, levels: readonly PassLevel[]): LevelStatus {
+  const sorted = [...levels].sort((a, b) => a.xp_required - b.xp_required)
+  const reached = sorted.filter((entry) => entry.xp_required <= xp)
+  return {
+    level: reached.length,
+    bonusSongs: reached.reduce((sum, entry) => sum + entry.bonus_songs, 0),
+    next: sorted.find((entry) => entry.xp_required > xp) ?? null,
+  }
+}
 
 // The Pass tab shows a dot while the user holds badges they have not seen on the pass yet.
 export const hasUnseenBadges = (

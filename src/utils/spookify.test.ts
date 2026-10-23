@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DAILY_LIMIT_MESSAGE,
   describeSpookifyError,
   fmkAssignmentComplete,
   fmkSubmitterReward,
@@ -90,6 +91,10 @@ describe('markAlreadyAdded', () => {
 })
 
 describe('describeSpookifyError', () => {
+  it('explains the daily song limit', () => {
+    expect(describeSpookifyError({ message: 'Daily song limit reached' })).toBe(DAILY_LIMIT_MESSAGE)
+  })
+
   it('reports a duplicate submission as "Song already added"', () => {
     expect(describeSpookifyError({ message: 'Song already added' })).toBe('Song already added')
   })

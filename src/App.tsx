@@ -11,6 +11,7 @@ import { SignupCodes } from './components/signup-codes'
 import { Spooks } from './components/spooks'
 import { Spookify } from './components/spookify'
 import { VotesAdmin } from './components/votes-admin'
+import { SongLimitAdmin } from './components/song-limit-admin'
 import { badgeDisplayName, CUSTOM_BADGE_MAX_LENGTH, giveCustomBadge, grantBadges } from './utils/badges'
 import { clampPoints, DEFAULT_CUSTOM_POINTS, hasUnseenBadges, MAX_BADGE_POINTS, PASS_BADGES } from './utils/battle-pass'
 import { BattlePass } from './components/battle-pass'
@@ -823,6 +824,7 @@ function App() {
 
               <SignupCodes />
               <VotesAdmin />
+              <SongLimitAdmin />
             </>
           )}
         </section>

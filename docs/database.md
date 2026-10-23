@@ -84,6 +84,17 @@ given song at most once and never sees their own songs, which `next_spookify_son
 enforces while picking a random unswiped song. Unlike votes, swipes are attributed
 to the swiper, but each user can read only their own.
 
+Apply `20261038_spookify_daily_song_limit.sql` for the daily song cap. A user can add at
+most `daily_song_limit` songs (default 10) in any rolling 24 hours; `add_spookify_song`
+raises `Daily song limit reached` beyond that. The value lives in `app_settings` and admins
+change it from the Admin page through `set_daily_song_limit`.
+
+Apply `20261039_battle_pass_levels.sql` to tie the limit to the battle pass. A user's limit is
+`daily_song_limit` plus the `bonus_songs` of every row in `battle_pass_levels` whose `xp_required` their
+XP has reached (level 1 is the lowest threshold). XP is recomputed server-side by `private.user_xp` with the
+same sum the pass shows. Admins add, edit and delete levels on the Admin page; members can read them.
+`my_song_allowance` returns the caller's XP, level, limit and songs added in the last 24 hours.
+
 Apply `20261030_add_spookify_fmk.sql` for Spookify FMK. A user's tier per song lives in
 `spookify_fmk_tiers` (points from sing and listen, plus a deleted flag) and the songs that
 already shared a round in `spookify_fmk_pairs`; both are readable only by their owner and

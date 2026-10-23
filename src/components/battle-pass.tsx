@@ -1,5 +1,13 @@
 import { useState } from 'react'
-import { buildTrack, computeXp, customLabelOf, DEFAULT_CUSTOM_POINTS, type PointsById } from '../utils/battle-pass'
+import {
+  buildTrack,
+  computeXp,
+  customLabelOf,
+  DEFAULT_CUSTOM_POINTS,
+  levelStatus,
+  type PassLevel,
+  type PointsById,
+} from '../utils/battle-pass'
 import { supabase } from '../utils/supabase/supabase-client'
 import { usePolling } from '../utils/use-polling'
 import './battle-pass.css'
@@ -18,23 +26,29 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
   const [points, setPoints] = useState<PointsById>({})
   const [customPoints, setCustomPoints] = useState<Record<string, number>>({})
   const [wonVotes, setWonVotes] = useState<WonVote[]>([])
+  const [levels, setLevels] = useState<PassLevel[]>([])
   const [error, setError] = useState('')
 
   usePolling(async (isCancelled) => {
-    const [pointsResult, customResult, winnersResult] = await Promise.all([
+    const [pointsResult, customResult, winnersResult, levelsResult] = await Promise.all([
       supabase.from('badge_points').select('badge_id, points'),
       supabase.from('custom_badge_points').select('label, points'),
       supabase.from('vote_winners').select('vote_id, votes(category, winner_points)').eq('user_id', userId),
-    ])
+      supabase.from('battle_pass_levels').select('id, xp_required, bonus_songs'),
+      ])
     if (isCancelled()) return
 
-    if (pointsResult.error || customResult.error || winnersResult.error) {
-      console.error('Failed to load battle pass:', pointsResult.error ?? customResult.error ?? winnersResult.error)
+    if (pointsResult.error || customResult.error || winnersResult.error || levelsResult.error) {
+      console.error(
+        'Failed to load battle pass:',
+        pointsResult.error ?? customResult.error ?? winnersResult.error ?? levelsResult.error,
+      )
       setError('Could not load the battle pass.')
       return
     }
 
     setError('')
+    setLevels((levelsResult.data ?? []) as PassLevel[])
     setPoints(Object.fromEntries((pointsResult.data ?? []).map((row) => [row.badge_id as string, row.points as number])))
     setCustomPoints(Object.fromEntries((customResult.data ?? []).map((row) => [row.label as string, row.points as number])))
     const rows = (winnersResult.data ?? []) as unknown as VoteWinnerRow[]
@@ -46,13 +60,14 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
   }, 15000)
 
   const track = buildTrack(badges, points, progress)
-  const { xp, trackTotal } = computeXp({
+  const { xp, trackTotal, breakdown } = computeXp({
     heldIds: badges,
     points,
     customPoints,
     voteWinnerPoints: wonVotes.map((vote) => vote.points),
   })
   const fill = trackTotal > 0 ? Math.min(100, (xp / trackTotal) * 100) : 0
+  const { level, bonusSongs, next } = levelStatus(xp, levels)
   const customLabels = badges.flatMap((id) => {
     const label = customLabelOf(id)
     return label ? [label] : []
@@ -83,6 +98,27 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
         >
           <div className="battle-pass-bar-fill" style={{ width: `${fill}%` }} />
         </div>
+        <div className="row row--between" data-testid="pass-level">
+          <strong>Level {level}</strong>
+          <span className="muted">
+            {bonusSongs > 0 ? `+${bonusSongs} bonus songs per day` : 'No bonus songs yet'}
+            {next ? ` · next level at ${next.xp_required} XP (+${next.bonus_songs})` : ''}
+          </span>
+        </div>
+        <ul className="list" aria-label="XP breakdown" data-testid="pass-breakdown">
+          <li className="row row--between">
+            <span className="muted">Pass badges</span>
+            <span data-testid="pass-xp-badges">{breakdown.badges} XP</span>
+          </li>
+          <li className="row row--between">
+            <span className="muted">Custom badges</span>
+            <span data-testid="pass-xp-custom">{breakdown.custom} XP</span>
+          </li>
+          <li className="row row--between">
+            <span className="muted">Vote wins</span>
+            <span data-testid="pass-xp-votes">{breakdown.votes} XP</span>
+          </li>
+        </ul>
       </div>
 
       <ol className="battle-pass-track" aria-label="Badges">
