@@ -13,6 +13,7 @@ const migrations = [
   'supabase/migrations/20261030_add_spookify_fmk.sql',
   'supabase/migrations/20261031_spookify_game_scores.sql',
   'supabase/migrations/20261032_spookify_song_points.sql',
+  'supabase/migrations/20261033_songmaster_badge.sql',
 ].map((path) => readFileSync(path, 'utf8'))
 
 describe.each([
@@ -101,6 +102,22 @@ describe.each([
 
   it('starts every account at a zero spookify score', async () => {
     expect(await scoreOf(ann)).toBe(0)
+  })
+
+  it('awards the songmaster badge once at 100 points and keeps other badges', async () => {
+    const badgesOf = async (user: string) => {
+      await db.exec('reset role')
+      const { rows } = await db.query<{ badges: string[] }>('select badges from public.users where id = $1', [user])
+      return rows[0].badges
+    }
+    await db.query("update public.users set badges = array['clicker'] where id = $1", [ann])
+    await db.query('select private.award_spookify($1, 99, 0, 0)', [ann])
+    expect(await badgesOf(ann)).toEqual(['clicker'])
+    await db.query('select private.award_spookify($1, 0.5, 0, 0)', [ann])
+    expect(await badgesOf(ann)).toEqual(['clicker'])
+    await db.query('select private.award_spookify($1, 0.5, 0, 0)', [ann])
+    await db.query('select private.award_spookify($1, 1, 0, 0)', [ann])
+    expect(await badgesOf(ann)).toEqual(['clicker', 'songmaster'])
   })
 
   describe('fmk', () => {

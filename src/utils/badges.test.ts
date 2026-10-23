@@ -49,6 +49,10 @@ describe('getUnlockedBadges', () => {
     )
   })
 
+  it('returns the songmaster message for the songmaster badge', () => {
+    expect(getUnlockedBadges(['songmaster']).map((badge) => badge.message)).toEqual(['Tati ist auch eine Rubik'])
+  })
+
   it('ignores unknown ids and handles empty input', () => {
     expect(getUnlockedBadges(['nope'])).toEqual([])
     expect(getUnlockedBadges(null)).toEqual([])

@@ -5,6 +5,13 @@ export type BadgeDefinition = {
 }
 
 export const CLICKER_BADGE_ID = 'clicker'
+export const SONGMASTER_BADGE_ID = 'songmaster'
+
+// Awarded server-side with the Spookify points (see award_spookify), so it has no click threshold.
+export const SONGMASTER_BADGE = {
+  id: SONGMASTER_BADGE_ID,
+  message: 'Tati ist auch eine Rubik',
+}
 
 // Ordered by ascending threshold. Add future badges here.
 export const BADGES: readonly BadgeDefinition[] = [
@@ -55,7 +62,7 @@ export const badgeDisplayName = (id: string): string =>
   id.startsWith(CUSTOM_BADGE_PREFIX) ? id.slice(CUSTOM_BADGE_PREFIX.length) : id
 
 // Pure lookup of unlocked badges in threshold order; unknown ids are ignored.
-export function getUnlockedBadges(ids: readonly string[] | null | undefined): BadgeDefinition[] {
+export function getUnlockedBadges(ids: readonly string[] | null | undefined): { id: string; message: string }[] {
   const unlocked = new Set(cleanIds(ids))
-  return BADGES.filter((badge) => unlocked.has(badge.id))
+  return [...BADGES, SONGMASTER_BADGE].filter((badge) => unlocked.has(badge.id))
 }
