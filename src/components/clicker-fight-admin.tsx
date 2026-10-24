@@ -54,11 +54,27 @@ export const ClickerFightAdmin = () => {
     setMessage('Clicker fight settings saved.')
   }
 
+  const handleResetLimits = async () => {
+    if (!window.confirm('Reset the daily song and clicker fight limits for everyone now?')) return
+    setBusy(true)
+    setError('')
+    setMessage('')
+    const { error: resetError } = await supabase.rpc('reset_daily_limits')
+    setBusy(false)
+    if (resetError) {
+      console.error('Failed to reset daily limits:', resetError)
+      setError(resetError.message || 'That action failed.')
+      return
+    }
+    setMessage('Daily limits reset.')
+  }
+
   return (
     <div className="card stack" data-testid="clicker-fight-admin">
       <h3>Clicker fights</h3>
       <p className="muted">
         Players with 250+ clicks may call a fight. Milestones can add bonus fights per day on top of the base limit.
+        Daily limits (songs and fights) reset at midnight.
       </p>
       {error && (
         <p role="alert" className="form-error">
@@ -97,6 +113,10 @@ export const ClickerFightAdmin = () => {
           Save
         </button>
       </form>
+
+      <button type="button" disabled={busy} onClick={() => void handleResetLimits()}>
+        Reset today's limits now
+      </button>
     </div>
   )
 }

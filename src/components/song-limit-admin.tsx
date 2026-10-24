@@ -209,7 +209,7 @@ export const SongLimitAdmin = () => {
     <div className="card stack" data-testid="song-limit-admin">
       <h3>Song limit</h3>
       <p className="muted">
-        Songs each user may add to the Spookify pool per 24 hours: the base limit plus the bonus songs of every battle pass reward they have unlocked.
+        Songs each user may add to the Spookify pool per day (resets at midnight): the base limit plus the bonus songs of every battle pass reward they have unlocked.
       </p>
       {error && (
         <p role="alert" className="form-error">

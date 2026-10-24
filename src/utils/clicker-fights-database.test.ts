@@ -74,7 +74,7 @@ describe('clicker fights', () => {
   }
   const stateOf = async (id: string) => {
     await asUser(id)
-    return (await db.query<{ running: boolean; fighters: number; daily_limit: number; calls_today: number }>(
+    return (await db.query<{ running: boolean; fighters: number; daily_limit: number; calls_today: number; next_call_at: string | null }>(
       'select * from public.clicker_fight_state()',
     )).rows[0]
   }
@@ -176,7 +176,7 @@ describe('clicker fights', () => {
     expect((await scores()).every((row) => !row.won)).toBe(true)
   })
 
-  it('limits calls per rolling day, raised by milestone bonus fights', async () => {
+  it('limits calls per day, raised by milestone bonus fights', async () => {
     await setClicks(ann, 250)
     await callFight(ann)
     await endFight()
@@ -191,6 +191,29 @@ describe('clicker fights', () => {
 
     await db.exec("reset role; update public.clicker_fights set started_at = now() - interval '25 hours', ends_at = now() - interval '24 hours'")
     expect((await stateOf(ann)).calls_today).toBe(0)
+  })
+
+  it('resets daily limits when an admin asks, for fights and songs alike', async () => {
+    await setClicks(ann, 250)
+    await callFight(ann)
+    await endFight()
+    await stateOf(ann)
+    await expect(callFight(ann)).rejects.toThrow('Daily fight limit')
+    expect((await stateOf(ann)).next_call_at).not.toBeNull()
+
+    await db.exec(`reset role; insert into public.spookify_songs (spotify_track_id, title, artist, added_by)
+      values ('t1', 'Song', 'Artist', '${ann}')`)
+    await asUser(ann)
+    expect(Number((await db.query<{ added_today: number }>('select * from public.my_song_allowance()')).rows[0].added_today)).toBe(1)
+
+    await expect(db.query('select public.reset_daily_limits()')).rejects.toThrow('Only admins')
+    await asUser(admin)
+    await db.query('select public.reset_daily_limits()')
+
+    await asUser(ann)
+    expect((await stateOf(ann)).calls_today).toBe(0)
+    expect(Number((await db.query<{ added_today: number }>('select * from public.my_song_allowance()')).rows[0].added_today)).toBe(0)
+    await callFight(ann)
   })
 
   it('lets only admins change the settings', async () => {

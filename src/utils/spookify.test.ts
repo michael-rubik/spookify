@@ -94,7 +94,7 @@ describe('markAlreadyAdded', () => {
 describe('describeSongAllowance', () => {
   it('shows what is left', () => {
     expect(describeSongAllowance({ xp: 0, level: 0, daily_limit: 10, added_today: 4 })).toBe(
-      '6 of 10 songs left in the last 24 hours.',
+      '6 of 10 songs left today.',
     )
   })
 

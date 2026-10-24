@@ -36,7 +36,7 @@
 
 **Bonus songs** — The extra songs per day a reward adds to the daily song limit. Bonus songs of all unlocked rewards stack.
 
-**Daily song limit** — How many songs a user may add to the pool in any rolling 24 hours: an admin-set base plus the bonus songs of every unlocked reward.
+**Daily song limit** — How many songs a user may add to the pool per day (resetting at midnight Europe/Berlin or when an admin resets it): an admin-set base plus the bonus songs of every unlocked reward.
 
 **Clicker fight** — A timed contest in the clicker view. Any fighter can call one; it runs for the admin-set duration (default 5 minutes), one at a time, and all fighters take part automatically. Ends with a winner and a fight leaderboard.
 _Avoid_: Battle, duel
@@ -49,7 +49,7 @@ _Avoid_: Battle, duel
 
 **Fight call** — A fighter starting a clicker fight. Uses one of their daily fight limit; refused while another fight is running.
 
-**Daily fight limit** — How many fights a user may call in any rolling 24 hours: an admin-set base (default 1) plus the bonus fights of every unlocked reward.
+**Daily fight limit** — How many fights a user may call per day (same reset as the daily song limit): an admin-set base (default 1) plus the bonus fights of every unlocked reward.
 
 **Bonus fights** — The extra fights per day a reward adds to the daily fight limit. Stack across all unlocked rewards.
 

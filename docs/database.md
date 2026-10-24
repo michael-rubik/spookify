@@ -85,7 +85,7 @@ enforces while picking a random unswiped song. Unlike votes, swipes are attribut
 to the swiper, but each user can read only their own.
 
 Apply `20261038_spookify_daily_song_limit.sql` for the daily song cap. A user can add at
-most `daily_song_limit` songs (default 10) in any rolling 24 hours; `add_spookify_song`
+most `daily_song_limit` songs (default 10) per day; `add_spookify_song`
 raises `Daily song limit reached` beyond that. The value lives in `app_settings` and admins
 change it from the Admin page through `set_daily_song_limit`.
 
@@ -93,7 +93,7 @@ Apply `20261039_battle_pass_levels.sql` to tie the limit to the battle pass. A u
 `daily_song_limit` plus the `bonus_songs` of every row in `battle_pass_levels` whose `xp_required` their
 XP has reached (level 1 is the lowest threshold). XP is recomputed server-side by `private.user_xp` with the
 same sum the pass shows. Admins add, edit and delete levels on the Admin page; members can read them.
-`my_song_allowance` returns the caller's XP, level, limit and songs added in the last 24 hours.
+`my_song_allowance` returns the caller's XP, level, limit and songs added today.
 
 Apply `20261030_add_spookify_fmk.sql` for Spookify FMK. A user's tier per song lives in
 `spookify_fmk_tiers` (points from sing and listen, plus a deleted flag) and the songs that
@@ -136,7 +136,7 @@ may call `call_clicker_fight()`; one fight runs at a time for `fight_duration_mi
 in `clicker_fight_scores`. Fights close lazily on the next `clicker_fight_state`,
 `call_clicker_fight`, `register_clicks` or `my_badge_progress` call; top scorers (ties
 included, at least two fighters) win and count towards the `fight-winner` badge. Calls
-per rolling 24h are `daily_fight_limit` (default 1) plus `battle_pass_levels.bonus_fights`
+per day are `daily_fight_limit` (default 1) plus `battle_pass_levels.bonus_fights`
 of unlocked milestones. Admins edit the settings through `set_clicker_fight_settings`.
 `fight-winner` is a tenth regular badge, so Winner winner now needs it. The migration swaps
 existing Winner winner holders to the `legacy-winner` badge (100 XP, off the track). See
