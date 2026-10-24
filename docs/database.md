@@ -135,7 +135,7 @@ may call `call_clicker_fight()`; one fight runs at a time for `fight_duration_mi
 (`app_settings`, default 5). Only clicks beyond 250 score, recorded by `register_clicks`
 in `clicker_fight_scores`. Fights close lazily on the next `clicker_fight_state`,
 `call_clicker_fight`, `register_clicks` or `my_badge_progress` call; top scorers (ties
-included, at least two fighters) win and count towards the `fight-winner` badge. Calls
+included, at least two fighters who scored) win and count towards the `fight-winner` badge. Calls
 per day are `daily_fight_limit` (default 1) plus `battle_pass_levels.bonus_fights`
 of unlocked milestones. Admins edit the settings through `set_clicker_fight_settings`.
 `fight-winner` is a tenth regular badge, so Winner winner now needs it. The migration swaps

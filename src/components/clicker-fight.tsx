@@ -19,6 +19,11 @@ type FightState = {
   daily_limit: number
   calls_today: number
   next_call_at: string | null
+  challenge_id: string | null
+  challenge_by: string | null
+  challenge_by_name: string | null
+  challenge_expires_at: string | null
+  challenge_expired: boolean
 }
 
 type ScoreRow = { user_id: string; clicks: number; won: boolean }
@@ -44,6 +49,8 @@ const formatWait = (ms: number) => {
 
 const callError = (message: string) => {
   if (message.includes('already running')) return 'A clicker fight is already running.'
+  if (message.includes('already waiting')) return 'A challenge is already waiting.'
+  if (message.includes('No challenge')) return 'That challenge is gone.'
   if (message.includes('limit')) return 'You have used all your fight calls for now.'
   if (message.includes('250 clicks')) return `You need ${FIGHT_MIN_CLICKS} clicks to call a clicker fight.`
   return 'Could not call the clicker fight.'
@@ -106,7 +113,7 @@ export const ClickerFight = ({ userId, clickCount }: ClickerFightProps) => {
         }),
       )
     },
-    state?.running ? 3000 : 10000,
+    state?.running || state?.challenge_id ? 3000 : 10000,
     !dev,
   )
 
@@ -118,23 +125,27 @@ export const ClickerFight = ({ userId, clickCount }: ClickerFightProps) => {
 
   const endsAt = state?.ends_at ? new Date(state.ends_at).getTime() : 0
   const remaining = endsAt - (now + skew)
+  const challengeEndsAt = state?.challenge_expires_at ? new Date(state.challenge_expires_at).getTime() : 0
+  const challengeRemaining = challengeEndsAt - (now + skew)
+  const waiting = Boolean(state?.challenge_id) && challengeRemaining > 0
 
-  // The fight is over locally before the server confirms it: refresh once.
+  // A fight or challenge is over locally before the server confirms it: refresh once.
   useEffect(() => {
-    if (running && remaining <= 0) void reload()
-  }, [running, remaining, reload])
+    if ((running && remaining <= 0) || (state?.challenge_id && challengeRemaining <= 0)) void reload()
+  }, [running, remaining, state?.challenge_id, challengeRemaining, reload])
 
   if (dev) return null
 
   const isFighter = clickCount >= FIGHT_MIN_CLICKS
   const nextCallMs = state?.next_call_at ? new Date(state.next_call_at).getTime() - (now + skew) : 0
   const atLimit = state ? state.calls_today >= state.daily_limit : false
-  const canCall = isFighter && !running && !atLimit && !busy
+  const canCall = isFighter && !running && !waiting && !atLimit && !busy
+  const isCaller = state?.challenge_by === userId
 
-  const handleCall = async () => {
+  const act = async (fn: 'call_clicker_fight' | 'accept_clicker_challenge' | 'cancel_clicker_challenge') => {
     setBusy(true)
     setError('')
-    const { error: rpcError } = await supabase.rpc('call_clicker_fight')
+    const { error: rpcError } = await supabase.rpc(fn)
     setBusy(false)
     if (rpcError) {
       setError(callError(rpcError.message))
@@ -152,6 +163,7 @@ export const ClickerFight = ({ userId, clickCount }: ClickerFightProps) => {
 
   let hint: string
   if (!isFighter) hint = `Reach ${FIGHT_MIN_CLICKS} clicks to join clicker fights (${clickCount}/${FIGHT_MIN_CLICKS}).`
+  else if (waiting) hint = isCaller ? 'Waiting for another contender to accept.' : 'Accept to start the fight.'
   else if (running) hint = 'Every click beyond 250 counts. Go!'
   else if (atLimit) hint = nextCallMs > 0 ? `Next fight call in ${formatWait(nextCallMs)}.` : 'No fight calls left.'
   else hint = `Fight calls left: ${Math.max(0, (state?.daily_limit ?? 0) - (state?.calls_today ?? 0))}`
@@ -164,14 +176,35 @@ export const ClickerFight = ({ userId, clickCount }: ClickerFightProps) => {
           <strong>Fight running · {formatDuration(remaining)}</strong>
           {state ? ` · ${state.fighters} fighters` : ''}
         </p>
+      ) : waiting ? (
+        <p data-testid="fight-status" data-state="challenge">
+          <strong>
+            ⚔️ {isCaller ? 'You challenge' : `${state?.challenge_by_name ?? 'Someone'} challenges`} the contenders ·{' '}
+            {formatDuration(challengeRemaining)}
+          </strong>
+        </p>
       ) : (
         <p className="muted" data-testid="fight-status" data-state="idle">
-          {state?.fight_id ? 'Last fight finished.' : 'No fight yet.'}
+          {state?.challenge_expired
+            ? 'Nobody accepted the challenge.'
+            : state?.fight_id
+              ? 'Last fight finished.'
+              : 'No fight yet.'}
         </p>
       )}
-      <button type="button" data-testid="call-fight" disabled={!canCall} onClick={() => void handleCall()}>
+      <button type="button" data-testid="call-fight" disabled={!canCall} onClick={() => void act('call_clicker_fight')}>
         {isFighter ? '⚔️ Call a clicker fight' : `🔒 ${FIGHT_MIN_CLICKS} clicks needed`}
       </button>
+      {waiting && isFighter && !isCaller && (
+        <button type="button" data-testid="accept-challenge" disabled={busy} onClick={() => void act('accept_clicker_challenge')}>
+          ✅ Accept challenge
+        </button>
+      )}
+      {waiting && isCaller && (
+        <button type="button" data-testid="cancel-challenge" disabled={busy} onClick={() => void act('cancel_clicker_challenge')}>
+          Cancel challenge
+        </button>
+      )}
       <p className="muted">{hint}</p>
       {error && (
         <p role="alert" className="form-error">

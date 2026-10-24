@@ -81,6 +81,12 @@ $$;
 
 revoke all on function private.close_clicker_fights(), private.fight_limit(uuid) from public, anon, authenticated;
 
+-- Dropped first so the file can be re-applied after later migrations changed these signatures.
+drop function if exists public.clicker_fight_settings();
+drop function if exists public.set_clicker_fight_settings(integer, integer);
+drop function if exists public.set_clicker_fight_settings(integer, integer, integer);
+drop function if exists public.clicker_fight_state();
+
 create or replace function public.clicker_fight_settings()
 returns table(duration_minutes integer, daily_limit integer)
 language sql stable security definer set search_path = ''

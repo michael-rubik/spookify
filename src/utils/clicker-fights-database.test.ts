@@ -39,6 +39,7 @@ describe('clicker fights', () => {
 
   beforeEach(async () => {
     await db.exec(`reset role; delete from public.clicker_fights; delete from auth.users; delete from public.signup_codes;
+      update public.app_settings set int_value = 0 where key = 'limits_reset_at';
       update public.app_settings set int_value = 5 where key = 'fight_duration_minutes';
       update public.app_settings set int_value = 1 where key = 'daily_fight_limit';
       update public.battle_pass_levels set bonus_fights = 0`)
@@ -72,9 +73,28 @@ describe('clicker fights', () => {
     await asUser(id)
     return db.query('select public.call_clicker_fight()')
   }
+  // Issues a challenge and has the admin (made a fighter) accept it.
+  const startFight = async (id: string) => {
+    await callFight(id)
+    await db.exec('reset role')
+    await db.query('update public.users set click_count = greatest(click_count, 250) where id = $1', [admin])
+    await asUser(admin)
+    return db.query('select public.accept_clicker_challenge()')
+  }
   const stateOf = async (id: string) => {
     await asUser(id)
-    return (await db.query<{ running: boolean; fighters: number; daily_limit: number; calls_today: number; next_call_at: string | null }>(
+    return (await db.query<{
+      running: boolean
+      fighters: number
+      daily_limit: number
+      calls_today: number
+      next_call_at: string | null
+      fight_id: string | null
+      challenge_id: string | null
+      challenge_by_name: string | null
+      challenge_expires_at: string | null
+      challenge_expired: boolean
+    }>(
       'select * from public.clicker_fight_state()',
     )).rows[0]
   }
@@ -88,13 +108,13 @@ describe('clicker fights', () => {
     )).rows
   }
 
-  it('only lets fighters with 250 clicks call a fight', async () => {
+  it('only lets contenders with 250 clicks call a fight', async () => {
     await setClicks(ann, 249)
     await expect(callFight(ann)).rejects.toThrow('250 clicks')
     await setClicks(ann, 250)
-    await callFight(ann)
+    await startFight(ann)
     expect((await stateOf(ben)).running).toBe(true)
-    expect((await stateOf(ben)).fighters).toBe(1)
+    expect((await stateOf(ben)).fighters).toBe(0)
   })
 
   it('runs one fight at a time', async () => {
@@ -102,10 +122,10 @@ describe('clicker fights', () => {
     await setClicks(ben, 300)
     await db.exec('reset role')
     await db.query("update public.app_settings set int_value = 5 where key = 'daily_fight_limit'")
-    await callFight(ann)
+    await startFight(ann)
     await expect(callFight(ben)).rejects.toThrow('already running')
     await endFight()
-    await callFight(ben)
+    await startFight(ben)
   })
 
   it('scores only the clicks beyond 250, and only while a fight runs', async () => {
@@ -115,7 +135,7 @@ describe('clicker fights', () => {
     expect(await scores()).toEqual([])
 
     await setClicks(ann, 250)
-    await callFight(ben)
+    await startFight(ben)
     await click(ann, 10)
     await setClicks(cat, 240)
     await click(cat, 30)
@@ -135,7 +155,7 @@ describe('clicker fights', () => {
     await setClicks(ann, 250)
     await setClicks(ben, 250)
     await setClicks(cat, 250)
-    await callFight(ann)
+    await startFight(ann)
     await click(ann, 10)
     await click(ben, 10)
     await click(cat, 4)
@@ -161,7 +181,7 @@ describe('clicker fights', () => {
 
   it('names no winner without two fighters or without clicks', async () => {
     await setClicks(ann, 250)
-    await callFight(ann)
+    await startFight(ann)
     await click(ann, 10)
     await endFight()
     await stateOf(ann)
@@ -170,7 +190,7 @@ describe('clicker fights', () => {
     await setClicks(ben, 250)
     await db.exec('reset role')
     await db.query("update public.app_settings set int_value = 5 where key = 'daily_fight_limit'")
-    await callFight(ben)
+    await startFight(ben)
     await endFight()
     await stateOf(ben)
     expect((await scores()).every((row) => !row.won)).toBe(true)
@@ -178,7 +198,7 @@ describe('clicker fights', () => {
 
   it('limits calls per day, raised by milestone bonus fights', async () => {
     await setClicks(ann, 250)
-    await callFight(ann)
+    await startFight(ann)
     await endFight()
     await expect(callFight(ann)).rejects.toThrow('Daily fight limit')
     const state = await stateOf(ann)
@@ -186,7 +206,7 @@ describe('clicker fights', () => {
 
     await db.exec(`reset role; update public.battle_pass_levels set bonus_fights = 1 where xp_required = (select min(xp_required) from public.battle_pass_levels);
       update public.users set badges = array['voter','karaoke','spooker','clicker'] where id = '${ann}'`)
-    await callFight(ann)
+    await startFight(ann)
     expect((await stateOf(ann)).daily_limit).toBe(2)
 
     await db.exec("reset role; update public.clicker_fights set started_at = now() - interval '25 hours', ends_at = now() - interval '24 hours'")
@@ -195,7 +215,7 @@ describe('clicker fights', () => {
 
   it('resets daily limits when an admin asks, for fights and songs alike', async () => {
     await setClicks(ann, 250)
-    await callFight(ann)
+    await startFight(ann)
     await endFight()
     await stateOf(ann)
     await expect(callFight(ann)).rejects.toThrow('Daily fight limit')
@@ -213,24 +233,81 @@ describe('clicker fights', () => {
     await asUser(ann)
     expect((await stateOf(ann)).calls_today).toBe(0)
     expect(Number((await db.query<{ added_today: number }>('select * from public.my_song_allowance()')).rows[0].added_today)).toBe(0)
+    await startFight(ann)
+  })
+
+  it('starts a fight only when another contender accepts the challenge', async () => {
+    await setClicks(ann, 250)
+    await setClicks(ben, 250)
+    await setClicks(cat, 249)
     await callFight(ann)
+    const waiting = await stateOf(cat)
+    expect([waiting.running, waiting.challenge_by_name]).toEqual([false, 'User 1'])
+    expect(waiting.challenge_expires_at).not.toBeNull()
+    await expect(callFight(ben)).rejects.toThrow('challenge is already waiting')
+
+    await asUser(ann)
+    await expect(db.query('select public.accept_clicker_challenge()')).rejects.toThrow('own challenge')
+    await asUser(cat)
+    await expect(db.query('select public.accept_clicker_challenge()')).rejects.toThrow('250 clicks')
+    await asUser(ben)
+    await db.query('select public.accept_clicker_challenge()')
+    await expect(db.query('select public.accept_clicker_challenge()')).rejects.toThrow('No challenge is waiting')
+    const started = await stateOf(cat)
+    expect([started.running, started.challenge_id, started.calls_today]).toEqual([true, null, 0])
+    expect((await stateOf(ann)).calls_today).toBe(1)
+  })
+
+  it('lets an unaccepted or withdrawn challenge cost nothing', async () => {
+    await setClicks(ann, 250)
+    await setClicks(ben, 250)
+    await callFight(ann)
+    await db.exec("reset role; update public.clicker_challenges set expires_at = now() - interval '1 second'")
+    await asUser(ben)
+    await expect(db.query('select public.accept_clicker_challenge()')).rejects.toThrow('No challenge is waiting')
+    const expired = await stateOf(ben)
+    expect([expired.running, expired.challenge_id, expired.challenge_expired, expired.calls_today]).toEqual([false, null, true, 0])
+    expect((await stateOf(ann)).fight_id).toBeNull()
+
+    await callFight(ann)
+    expect((await stateOf(ben)).challenge_expired).toBe(false)
+    await asUser(ben)
+    await db.query('select public.cancel_clicker_challenge()')
+    expect((await stateOf(ann)).challenge_id).not.toBeNull()
+    await asUser(ann)
+    await db.query('select public.cancel_clicker_challenge()')
+    expect((await stateOf(ann)).challenge_id).toBeNull()
+    await startFight(ann)
+    expect((await stateOf(ann)).calls_today).toBe(1)
+  })
+
+  it('names no winner when only one contender scored', async () => {
+    await setClicks(ann, 250)
+    await setClicks(ben, 250)
+    await startFight(ann)
+    await click(ann, 10)
+    await endFight()
+    await stateOf(ann)
+    expect((await scores()).map((row) => row.won)).toEqual([false])
   })
 
   it('lets only admins change the settings', async () => {
     await asUser(ann)
     await expect(db.query('select public.set_clicker_fight_settings(10, 2)')).rejects.toThrow('Only admins')
     await asUser(admin)
-    await db.query('select public.set_clicker_fight_settings(10, 2)')
+    await db.query('select public.set_clicker_fight_settings(10, 2, 3)')
     await expect(db.query('select public.set_clicker_fight_settings(0, 2)')).rejects.toThrow('1 to 120')
-    const { rows } = await db.query<{ duration_minutes: number; daily_limit: number }>('select * from public.clicker_fight_settings()')
-    expect(rows).toEqual([{ duration_minutes: 10, daily_limit: 2 }])
+    await expect(db.query('select public.set_clicker_fight_settings(10, 2, 61)')).rejects.toThrow('1 to 60')
+    const { rows } = await db.query<{ duration_minutes: number; daily_limit: number; challenge_minutes: number }>('select * from public.clicker_fight_settings()')
+    expect(rows).toEqual([{ duration_minutes: 10, daily_limit: 2, challenge_minutes: 3 }])
   })
 
   it('swaps Winner winner for the legacy badge, once', async () => {
     await db.exec(`reset role; update public.users set badges = array['clicker','winner-winner'] where id = '${ann}';
       update public.users set badges = array['fight-winner','winner-winner'] where id = '${ben}'`)
-    await db.exec(migration)
-    await db.exec(migration)
+    const swap = migration.slice(migration.lastIndexOf('update public.users'))
+    await db.exec(swap)
+    await db.exec(swap)
     const badgesOf = async (id: string) =>
       (await db.query<{ badges: string[] }>('select badges from public.users where id = $1', [id])).rows[0].badges
     expect(await badgesOf(ann)).toEqual(['clicker', 'legacy-winner'])
@@ -239,7 +316,7 @@ describe('clicker fights', () => {
 
   it('removes a deleted user from the fight', async () => {
     await setClicks(ann, 250)
-    await callFight(ann)
+    await startFight(ann)
     await click(ann, 5)
     await db.exec(`reset role; delete from auth.users where id = '${ann}'`)
     expect(await scores()).toEqual([])

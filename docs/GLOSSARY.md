@@ -38,22 +38,28 @@
 
 **Daily song limit** — How many songs a user may add to the pool per day (resetting at midnight Europe/Berlin or when an admin resets it): an admin-set base plus the bonus songs of every unlocked reward.
 
-**Clicker fight** — A timed contest in the clicker view. Any fighter can call one; it runs for the admin-set duration (default 5 minutes), one at a time, and all fighters take part automatically. Ends with a winner and a fight leaderboard.
+**Clicker fight** — A timed contest in the clicker view. A contender issues a challenge and it starts only once another contender accepts. It runs for the admin-set duration (default 5 minutes), one at a time, and every contender can take part. Ends with a winner and a fight leaderboard.
 _Avoid_: Battle, duel
 
-**Fighter** — A user whose lifetime click count has reached 250. Only fighters may call a clicker fight, and every fighter takes part in the current one, including those who reach 250 while it runs.
+**Contender** — A user whose lifetime click count has reached 250. Only contenders may call or accept a clicker fight, and every contender can take part in the current one, including those who reach 250 while it runs.
 
-**Fight click** — A click registered during a clicker fight by a fighter. It also counts as an ordinary click; it additionally adds to the fighter's fight score.
+**Fighter** — A contender who has scored in a given clicker fight, i.e. clicked during it. Only fighters appear on the fight leaderboard.
+
+**Fight click** — A click registered during a clicker fight by a contender. It also counts as an ordinary click; it additionally adds to the fighter's fight score.
 
 **Fight score** — A fighter's number of fight clicks in one clicker fight. Ranks the fight leaderboard, which shows the running fight live.
 
-**Fight call** — A fighter starting a clicker fight. Uses one of their daily fight limit; refused while another fight is running.
+**Fight call** — A contender issuing a challenge. Refused while another challenge or fight exists, or when their daily fight limit is used up. Only an accepted challenge uses up one of the daily limit.
+
+**Challenge** — A pending fight call waiting for another contender to accept it, visible to every user with a countdown. Accepting starts the clicker fight. If nobody accepts within the acceptance window, or the caller withdraws it, no fight starts and no daily limit is used.
+
+**Acceptance window** — How long a challenge waits for someone to accept it. Admin-set, default 1 minute.
 
 **Daily fight limit** — How many fights a user may call per day (same reset as the daily song limit): an admin-set base (default 1) plus the bonus fights of every unlocked reward.
 
 **Bonus fights** — The extra fights per day a reward adds to the daily fight limit. Stack across all unlocked rewards.
 
-**Fight winner** — The fighter with the highest fight score when a clicker fight ends; ties all win. A fight needs at least two fighters and a top score above 0 to have winners. Earns the "Win your first clicker fight" badge if they lack it.
+**Fight winner** — The fighter with the highest fight score when a clicker fight ends; ties all win. A fight needs at least two fighters to have winners. Earns the "Win your first clicker fight" badge if they lack it.
 
 **Vote** — A named, admin-run event in which users pick their favourite costume for a category. Open until an admin ends it; then it is ended and its results are public.
 

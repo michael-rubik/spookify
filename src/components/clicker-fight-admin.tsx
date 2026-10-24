@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { supabase } from '../utils/supabase/supabase-client'
 
-type Settings = { duration_minutes: number; daily_limit: number }
+type Settings = { duration_minutes: number; daily_limit: number; challenge_minutes: number }
 
 export const ClickerFightAdmin = () => {
   const [minutes, setMinutes] = useState('')
   const [limit, setLimit] = useState('')
+  const [challengeMinutes, setChallengeMinutes] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -25,6 +26,7 @@ export const ClickerFightAdmin = () => {
       }
       setMinutes(String(settings.duration_minutes))
       setLimit(String(settings.daily_limit))
+      setChallengeMinutes(String(settings.challenge_minutes))
       setLoaded(true)
     }
     void load()
@@ -37,14 +39,19 @@ export const ClickerFightAdmin = () => {
     event.preventDefault()
     const m = Number(minutes)
     const l = Number(limit)
-    if (!Number.isInteger(m) || m < 1 || m > 120 || !Number.isInteger(l) || l < 0 || l > 100) {
-      setError('A fight lasts 1 to 120 minutes and the daily limit is 0 to 100.')
+    const c = Number(challengeMinutes)
+    if (!Number.isInteger(m) || m < 1 || m > 120 || !Number.isInteger(l) || l < 0 || l > 100 || !Number.isInteger(c) || c < 1 || c > 60) {
+      setError('A fight lasts 1 to 120 minutes, the daily limit is 0 to 100 and a challenge waits 1 to 60 minutes.')
       return
     }
     setBusy(true)
     setError('')
     setMessage('')
-    const { error: saveError } = await supabase.rpc('set_clicker_fight_settings', { p_minutes: m, p_limit: l })
+    const { error: saveError } = await supabase.rpc('set_clicker_fight_settings', {
+      p_minutes: m,
+      p_limit: l,
+      p_challenge_minutes: c,
+    })
     setBusy(false)
     if (saveError) {
       console.error('Failed to save clicker fight settings:', saveError)
@@ -108,6 +115,17 @@ export const ClickerFightAdmin = () => {
           disabled={!loaded}
           value={limit}
           onChange={(event) => setLimit(event.target.value)}
+        />
+        <label htmlFor="fight-challenge-minutes">Challenge waits (minutes)</label>
+        <input
+          id="fight-challenge-minutes"
+          type="number"
+          min={1}
+          max={60}
+          required
+          disabled={!loaded}
+          value={challengeMinutes}
+          onChange={(event) => setChallengeMinutes(event.target.value)}
         />
         <button type="submit" disabled={busy || !loaded}>
           Save
