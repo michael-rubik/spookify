@@ -265,6 +265,12 @@ describe.each([
       expect(await scoreOf(ann, 'submitter_score')).toBe(0)
       expect(await scoreOf(cat)).toBe(1)
       expect(await songPoints(first)).toBe(0)
+
+      await db.exec(readFileSync('supabase/migrations/20261047_restore_add_song_tinder_points.sql', 'utf8'))
+      expect(await songPoints(first)).toBe(1)
+      expect(await scoreOf(ann, 'submitter_score')).toBe(1)
+      expect(await scoreOf(ann)).toBe(1)
+      expect(await scoreOf(ben)).toBe(0)
       const { rows } = await db.query<{ songs: number; tiers: number; trios: number }>(`
         select (select count(*)::int from public.spookify_songs) as songs,
                (select count(*)::int from public.spookify_fmk_tiers) as tiers,
