@@ -5,6 +5,7 @@ import {
   customLabelOf,
   DEFAULT_CUSTOM_POINTS,
   describeRewardGroup,
+  LEGACY_WINNER,
   levelStatus,
   passScale,
   rewardGroups,
@@ -38,7 +39,7 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
       supabase.from('badge_points').select('badge_id, points'),
       supabase.from('custom_badge_points').select('label, points'),
       supabase.from('vote_winners').select('vote_id, votes(category, winner_points)').eq('user_id', userId),
-      supabase.from('battle_pass_levels').select('id, xp_required, bonus_songs'),
+      supabase.from('battle_pass_levels').select('id, xp_required, bonus_songs, bonus_fights'),
       ])
     if (isCancelled()) return
 
@@ -72,7 +73,18 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
   })
   const scale = passScale(trackTotal, levels)
   const fill = Math.min(100, (xp / scale) * 100)
-  const { level, bonusSongs, next } = levelStatus(xp, levels)
+  const { level, bonusSongs, bonusFights, next } = levelStatus(xp, levels)
+  const perks = [
+    bonusSongs > 0 ? `+${bonusSongs} bonus songs` : '',
+    bonusFights > 0 ? `+${bonusFights} bonus fights` : '',
+  ].filter(Boolean)
+  const perkSummary = perks.length > 0 ? `${perks.join(', ')} per day` : 'No bonus perks yet'
+  const nextPerks = next
+    ? [next.bonus_songs > 0 ? `+${next.bonus_songs} songs` : '', next.bonus_fights > 0 ? `+${next.bonus_fights} fights` : '']
+        .filter(Boolean)
+        .join(', ')
+    : ''
+  const hasLegacy = badges.includes(LEGACY_WINNER.id)
   const groups = rewardGroups(levels, xp, scale)
   const customLabels = badges.flatMap((id) => {
     const label = customLabelOf(id)
@@ -128,7 +140,7 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
                   onBlur={() => setActiveReward((current) => (current === group.key ? null : current))}
                   onClick={() => setActiveReward((current) => (current === group.key ? null : group.key))}
                 >
-                  🎵
+                  {group.bonusSongs === 0 && group.bonusFights > 0 ? '⚔️' : '🎵'}
                 </button>
                 {activeReward === group.key && (
                   <span role="tooltip" className={`battle-pass-tooltip${edge}`} data-testid="pass-reward-tooltip">
@@ -142,8 +154,8 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
         <div className="row row--between" data-testid="pass-level">
           <strong>Level {level}</strong>
           <span className="muted">
-            {bonusSongs > 0 ? `+${bonusSongs} bonus songs per day` : 'No bonus songs yet'}
-            {next ? ` · next reward at ${next.xp_required} XP (+${next.bonus_songs})` : ''}
+            {perkSummary}
+            {next ? ` · next reward at ${next.xp_required} XP (${nextPerks})` : ''}
           </span>
         </div>
         <ul className="list" aria-label="XP breakdown" data-testid="pass-breakdown">
@@ -208,7 +220,7 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
         })}
       </ol>
 
-      {(customLabels.length > 0 || wonVotes.length > 0) && (
+      {(customLabels.length > 0 || wonVotes.length > 0 || hasLegacy) && (
         <div className="card stack">
           <h3 style={{ margin: 0 }}>Collected</h3>
           <ul className="list" aria-label="Collected badges">
@@ -218,6 +230,12 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
                 <span className="pill">+{vote.points} XP</span>
               </li>
             ))}
+            {hasLegacy && (
+              <li className="row row--between" data-testid="legacy-badge">
+                <span>🏅 {LEGACY_WINNER.title}</span>
+                <span className="pill">+{points[LEGACY_WINNER.id] ?? LEGACY_WINNER.defaultPoints} XP</span>
+              </li>
+            )}
             {customLabels.map((label) => (
               <li key={label} className="row row--between" data-testid="custom-badge">
                 <span>🎖️ {label}</span>

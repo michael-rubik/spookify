@@ -128,6 +128,20 @@ selectable by clients: they call `visible_costumes()`, which returns everyone's 
 while shown and only the caller's own while hidden. Select `USER_COLUMNS`
 (`src/utils/costumes.ts`) instead of `*`, and grant any new `users` column explicitly.
 
+## Clicker fights
+
+Apply `20261042_clicker_fights.sql`. Players with at least 250 lifetime clicks (fighters)
+may call `call_clicker_fight()`; one fight runs at a time for `fight_duration_minutes`
+(`app_settings`, default 5). Only clicks beyond 250 score, recorded by `register_clicks`
+in `clicker_fight_scores`. Fights close lazily on the next `clicker_fight_state`,
+`call_clicker_fight`, `register_clicks` or `my_badge_progress` call; top scorers (ties
+included, at least two fighters) win and count towards the `fight-winner` badge. Calls
+per rolling 24h are `daily_fight_limit` (default 1) plus `battle_pass_levels.bonus_fights`
+of unlocked milestones. Admins edit the settings through `set_clicker_fight_settings`.
+`fight-winner` is a tenth regular badge, so Winner winner now needs it. The migration swaps
+existing Winner winner holders to the `legacy-winner` badge (100 XP, off the track). See
+`docs/adr/0002-clicker-fights-retire-winner-winner.md`.
+
 ## End-to-end tests
 
 `npm run test:e2e` runs Playwright against a throwaway Postgres + PostgREST in a

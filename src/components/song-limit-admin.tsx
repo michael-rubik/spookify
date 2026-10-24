@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { supabase } from '../utils/supabase/supabase-client'
-import { MAX_LEVEL_BONUS_SONGS, MAX_LEVEL_XP, type PassLevel } from '../utils/battle-pass'
+import { MAX_LEVEL_BONUS_FIGHTS, MAX_LEVEL_BONUS_SONGS, MAX_LEVEL_XP, type PassLevel } from '../utils/battle-pass'
 
 const MAX_DAILY_SONG_LIMIT = 1000
 
@@ -11,21 +11,26 @@ type LevelRowProps = {
   level: PassLevel
   position: number
   disabled: boolean
-  onSave: (level: PassLevel, xp: number, bonus: number) => unknown
+  onSave: (level: PassLevel, xp: number, bonus: number, fights: number) => unknown
   onDelete: (level: PassLevel) => unknown
 }
 
 const LevelRow = ({ level, position, disabled, onSave, onDelete }: LevelRowProps) => {
   const [xp, setXp] = useState<string | null>(null)
   const [bonus, setBonus] = useState<string | null>(null)
+  const [fights, setFights] = useState<string | null>(null)
 
   const commit = () => {
-    if (xp === null && bonus === null) return
+    if (xp === null && bonus === null && fights === null) return
     const nextXp = Number(xp ?? level.xp_required)
     const nextBonus = Number(bonus ?? level.bonus_songs)
+    const nextFights = Number(fights ?? level.bonus_fights)
     setXp(null)
     setBonus(null)
-    if (nextXp !== level.xp_required || nextBonus !== level.bonus_songs) void onSave(level, nextXp, nextBonus)
+    setFights(null)
+    if (nextXp !== level.xp_required || nextBonus !== level.bonus_songs || nextFights !== level.bonus_fights) {
+      void onSave(level, nextXp, nextBonus, nextFights)
+    }
   }
 
   return (
@@ -57,6 +62,32 @@ const LevelRow = ({ level, position, disabled, onSave, onDelete }: LevelRowProps
           onBlur={commit}
         />
       </label>
+      <label className="row">
+        <span className="muted">Reward: bonus fights</span>
+        <input
+          type="number"
+          min={0}
+          max={MAX_LEVEL_BONUS_FIGHTS}
+          disabled={disabled}
+          aria-label={`Reward (bonus fights) for milestone ${position}`}
+          value={fights ?? String(level.bonus_fights)}
+          onChange={(event) => setFights(event.target.value)}
+          onBlur={commit}
+        />
+      </label>
+      <label className="row">
+        <span className="muted">Reward: bonus fights</span>
+        <input
+          type="number"
+          min={0}
+          max={MAX_LEVEL_BONUS_FIGHTS}
+          disabled={disabled}
+          aria-label={`Reward (bonus fights) for milestone ${position}`}
+          value={fights ?? String(level.bonus_fights)}
+          onChange={(event) => setFights(event.target.value)}
+          onBlur={commit}
+        />
+      </label>
       <button type="button" disabled={disabled} onClick={() => onDelete(level)}>
         Delete
       </button>
@@ -65,13 +96,14 @@ const LevelRow = ({ level, position, disabled, onSave, onDelete }: LevelRowProps
 }
 
 const fetchLevels = () =>
-  supabase.from('battle_pass_levels').select('id, xp_required, bonus_songs').order('xp_required', { ascending: true })
+  supabase.from('battle_pass_levels').select('id, xp_required, bonus_songs, bonus_fights').order('xp_required', { ascending: true })
 
 export const SongLimitAdmin = () => {
   const [limit, setLimit] = useState('')
   const [levels, setLevels] = useState<PassLevel[]>([])
   const [newXp, setNewXp] = useState('')
   const [newBonus, setNewBonus] = useState('1')
+  const [newFights, setNewFights] = useState('0')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [isBusy, setIsBusy] = useState(false)
@@ -140,9 +172,11 @@ export const SongLimitAdmin = () => {
     }
   }
 
-  const validLevel = (xp: number, bonus: number) => {
-    if (isWholeNumber(xp, MAX_LEVEL_XP) && isWholeNumber(bonus, MAX_LEVEL_BONUS_SONGS)) return true
-    setError(`XP must be 0 to ${MAX_LEVEL_XP} and bonus songs 0 to ${MAX_LEVEL_BONUS_SONGS}.`)
+  const validLevel = (xp: number, bonus: number, fights: number) => {
+    if (isWholeNumber(xp, MAX_LEVEL_XP) && isWholeNumber(bonus, MAX_LEVEL_BONUS_SONGS) && isWholeNumber(fights, MAX_LEVEL_BONUS_FIGHTS)) {
+      return true
+    }
+    setError(`XP must be 0 to ${MAX_LEVEL_XP}, bonus songs 0 to ${MAX_LEVEL_BONUS_SONGS} and bonus fights 0 to ${MAX_LEVEL_BONUS_FIGHTS}.`)
     return false
   }
 
@@ -150,17 +184,18 @@ export const SongLimitAdmin = () => {
     event.preventDefault()
     const xp = Number(newXp)
     const bonus = Number(newBonus)
-    if (!validLevel(xp, bonus)) return
+    const fights = Number(newFights)
+    if (!validLevel(xp, bonus, fights)) return
 
-    if (await run(() => supabase.from('battle_pass_levels').insert({ xp_required: xp, bonus_songs: bonus }), 'Milestone added.')) {
+    if (await run(() => supabase.from('battle_pass_levels').insert({ xp_required: xp, bonus_songs: bonus, bonus_fights: fights }), 'Milestone added.')) {
       setNewXp('')
     }
   }
 
-  const handleSaveLevel = (level: PassLevel, xp: number, bonus: number) => {
-    if (!validLevel(xp, bonus)) return
+  const handleSaveLevel = (level: PassLevel, xp: number, bonus: number, fights: number) => {
+    if (!validLevel(xp, bonus, fights)) return
     return run(
-      () => supabase.from('battle_pass_levels').update({ xp_required: xp, bonus_songs: bonus }).eq('id', level.id),
+      () => supabase.from('battle_pass_levels').update({ xp_required: xp, bonus_songs: bonus, bonus_fights: fights }).eq('id', level.id),
       'Milestone saved.',
     )
   }
@@ -238,6 +273,16 @@ export const SongLimitAdmin = () => {
           required
           value={newBonus}
           onChange={(event) => setNewBonus(event.target.value)}
+        />
+        <label htmlFor="new-level-fights">Reward: bonus fights</label>
+        <input
+          id="new-level-fights"
+          type="number"
+          min={0}
+          max={MAX_LEVEL_BONUS_FIGHTS}
+          required
+          value={newFights}
+          onChange={(event) => setNewFights(event.target.value)}
         />
         <button type="submit" disabled={isBusy}>
           Add milestone

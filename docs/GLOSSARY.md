@@ -14,9 +14,11 @@
 
 **Badge message** — The text attached to a badge, visible only to its owner on the battle pass while the badge is held. Locked badges show only their goal and progress.
 
-**Regular badge** — One of the nine built-in badges with a condition: clicks, Spookify score, spooks posted, being tagged, right swipes on one song, karaoke songs performed (3), Spookify Tinder swipes (50), FMK rounds finished (25) and casting a ballot. Not custom badges or winner badges.
+**Regular badge** — One of the ten built-in badges with a condition: clicks, Spookify score, spooks posted, being tagged, right swipes on one song, karaoke songs performed (3), Spookify Tinder swipes (50), FMK rounds finished (25), casting a ballot and winning a clicker fight (200 XP by default). Not custom badges or winner badges.
 
-**Winner winner** — The final badge, with the message "chicken dinner". Earned when a user holds every regular badge, that is, the full regular XP. Custom badges and winner badges never count towards it.
+**Winner winner** — The final badge, with the message "chicken dinner". Earned when a user holds every regular badge, that is, the full regular XP. Custom badges, winner badges and the legacy badge never count towards it.
+
+**Legacy badge** — "Ich war schon mal winner", 100 XP, message "Du warst schon mal Winner winner". Given once to everyone who held Winner winner when clicker fights arrived, who lose Winner winner at the same time and must earn it again. Nobody else can get it; it is not a regular badge.
 
 **Custom badge** — A badge an admin gives with its own text. The admin must set its points (default 10); the points belong to the text and stay editable.
 
@@ -28,13 +30,30 @@
 
 **Milestone** — An XP threshold on the battle pass, set by admins. Each milestone carries one reward.
 
-**Reward** — The perk a milestone unlocks once a user's XP reaches it. Today the only kind is bonus songs. Badges are not rewards: they are achievements that give XP.
+**Reward** — The perk a milestone unlocks once a user's XP reaches it. Two kinds: bonus songs and bonus fights. Badges are not rewards: they are achievements that give XP.
 
 **Level** — The number of milestones a user's XP has reached. Derived for display, never configured.
 
 **Bonus songs** — The extra songs per day a reward adds to the daily song limit. Bonus songs of all unlocked rewards stack.
 
 **Daily song limit** — How many songs a user may add to the pool in any rolling 24 hours: an admin-set base plus the bonus songs of every unlocked reward.
+
+**Clicker fight** — A timed contest in the clicker view. Any fighter can call one; it runs for the admin-set duration (default 5 minutes), one at a time, and all fighters take part automatically. Ends with a winner and a fight leaderboard.
+_Avoid_: Battle, duel
+
+**Fighter** — A user whose lifetime click count has reached 250. Only fighters may call a clicker fight, and every fighter takes part in the current one, including those who reach 250 while it runs.
+
+**Fight click** — A click registered during a clicker fight by a fighter. It also counts as an ordinary click; it additionally adds to the fighter's fight score.
+
+**Fight score** — A fighter's number of fight clicks in one clicker fight. Ranks the fight leaderboard, which shows the running fight live.
+
+**Fight call** — A fighter starting a clicker fight. Uses one of their daily fight limit; refused while another fight is running.
+
+**Daily fight limit** — How many fights a user may call in any rolling 24 hours: an admin-set base (default 1) plus the bonus fights of every unlocked reward.
+
+**Bonus fights** — The extra fights per day a reward adds to the daily fight limit. Stack across all unlocked rewards.
+
+**Fight winner** — The fighter with the highest fight score when a clicker fight ends; ties all win. A fight needs at least two fighters and a top score above 0 to have winners. Earns the "Win your first clicker fight" badge if they lack it.
 
 **Vote** — A named, admin-run event in which users pick their favourite costume for a category. Open until an admin ends it; then it is ended and its results are public.
 

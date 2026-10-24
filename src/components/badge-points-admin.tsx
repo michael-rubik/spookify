@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ALL_PASS_BADGES, clampPoints, MAX_BADGE_POINTS, pointsFor, type PointsById } from '../utils/battle-pass'
+import { POINT_BADGES, clampPoints, MAX_BADGE_POINTS, pointsFor, type PointsById } from '../utils/battle-pass'
 import { supabase } from '../utils/supabase/supabase-client'
 import { usePolling } from '../utils/use-polling'
 
@@ -67,7 +67,7 @@ export function BadgePointsAdmin() {
     <div className="card stack" data-testid="badge-points-admin">
       <h3 style={{ margin: 0 }}>Badge points</h3>
       <p className="muted">XP each badge gives. Changes apply to everyone who already holds the badge.</p>
-      {ALL_PASS_BADGES.map((badge) => field('badge', badge.id, badge.title, pointsFor(badge, points)))}
+      {POINT_BADGES.map((badge) => field('badge', badge.id, badge.title, pointsFor(badge, points)))}
       {Object.keys(customPoints).length > 0 && <h4 style={{ margin: 0 }}>Custom badges</h4>}
       {Object.entries(customPoints)
         .sort(([a], [b]) => a.localeCompare(b))

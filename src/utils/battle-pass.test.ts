@@ -14,14 +14,14 @@ import {
 } from './battle-pass'
 
 describe('battle pass catalog', () => {
-  it('has nine regular badges plus Winner winner, all with a message', () => {
-    expect(PASS_BADGES).toHaveLength(9)
+  it('has ten regular badges plus Winner winner, all with a message', () => {
+    expect(PASS_BADGES).toHaveLength(10)
     expect(ALL_PASS_BADGES.every((badge) => badge.message.length > 0)).toBe(true)
     expect(WINNER_WINNER.message).toBe('chicken dinner')
   })
 
-  it('totals 1,700 default XP for the regular badges', () => {
-    expect(PASS_BADGES.reduce((sum, badge) => sum + badge.defaultPoints, 0)).toBe(1700)
+  it('totals 1,900 default XP for the regular badges', () => {
+    expect(PASS_BADGES.reduce((sum, badge) => sum + badge.defaultPoints, 0)).toBe(1900)
   })
 })
 
@@ -41,7 +41,7 @@ describe('buildTrack', () => {
 
   it('accumulates milestones, marks earned nodes and caps progress at the target', () => {
     const track = buildTrack(['voter'], {}, { voter: 1, clicker: 9999, tagged: 4 })
-    expect(track.at(-1)?.milestone).toBe(2200)
+    expect(track.at(-1)?.milestone).toBe(2400)
     expect(track.find((node) => node.badge.id === 'voter')?.earned).toBe(true)
     expect(track.find((node) => node.badge.id === 'clicker')?.progress).toBe(500)
     expect(track.find((node) => node.badge.id === 'tagged')?.progress).toBe(4)
@@ -50,15 +50,20 @@ describe('buildTrack', () => {
 
 describe('reward icons', () => {
   const levels = [
-    { id: 'a', xp_required: 200, bonus_songs: 1 },
-    { id: 'b', xp_required: 220, bonus_songs: 2 },
-    { id: 'c', xp_required: 1000, bonus_songs: 1 },
+    { id: 'a', xp_required: 200, bonus_songs: 1, bonus_fights: 0 },
+    { id: 'b', xp_required: 220, bonus_songs: 2, bonus_fights: 0 },
+    { id: 'c', xp_required: 1000, bonus_songs: 1, bonus_fights: 0 },
   ]
 
   it('scales the bar to the highest milestone when it passes the track total', () => {
     expect(passScale(2200, levels)).toBe(2200)
     expect(passScale(500, levels)).toBe(1000)
     expect(passScale(0, [])).toBe(1)
+  })
+
+  it('describes bonus fights next to bonus songs', () => {
+    const [group] = rewardGroups([{ id: 'f', xp_required: 100, bonus_songs: 0, bonus_fights: 2 }], 0, 1000)
+    expect(describeRewardGroup(group)).toBe('+2 fights per day · Unlocked at 100 XP')
   })
 
   it('merges close milestones and keeps far ones apart', () => {
@@ -80,21 +85,21 @@ describe('reward icons', () => {
 
 describe('levelStatus', () => {
   const levels = [
-    { id: 'b', xp_required: 500, bonus_songs: 2 },
-    { id: 'a', xp_required: 200, bonus_songs: 1 },
-    { id: 'c', xp_required: 1000, bonus_songs: 3 },
+    { id: 'b', xp_required: 500, bonus_songs: 2, bonus_fights: 0 },
+    { id: 'a', xp_required: 200, bonus_songs: 1, bonus_fights: 0 },
+    { id: 'c', xp_required: 1000, bonus_songs: 3, bonus_fights: 0 },
   ]
 
   it('is level 0 with no bonus below the first threshold', () => {
-    expect(levelStatus(199, levels)).toEqual({ level: 0, bonusSongs: 0, next: levels[1] })
+    expect(levelStatus(199, levels)).toEqual({ level: 0, bonusSongs: 0, bonusFights: 0, next: levels[1] })
   })
 
   it('stacks bonuses of every reached level, whatever the input order', () => {
-    expect(levelStatus(500, levels)).toEqual({ level: 2, bonusSongs: 3, next: levels[2] })
+    expect(levelStatus(500, levels)).toEqual({ level: 2, bonusSongs: 3, bonusFights: 0, next: levels[2] })
   })
 
   it('has no next level at the top', () => {
-    expect(levelStatus(5000, levels)).toEqual({ level: 3, bonusSongs: 6, next: null })
+    expect(levelStatus(5000, levels)).toEqual({ level: 3, bonusSongs: 6, bonusFights: 0, next: null })
   })
 })
 
@@ -123,7 +128,12 @@ describe('computeXp', () => {
   })
 
   it('reports the track total including Winner winner', () => {
-    expect(computeXp({ ...base, heldIds: [] }).trackTotal).toBe(2200)
+    expect(computeXp({ ...base, heldIds: [] }).trackTotal).toBe(2400)
+  })
+
+  it('counts the legacy badge as XP but keeps it off the track', () => {
+    expect(computeXp({ ...base, heldIds: ['legacy-winner'] }).xp).toBe(100)
+    expect(buildTrack(['legacy-winner'], {}, {}).some((node) => node.badge.id === 'legacy-winner')).toBe(false)
   })
 
   it('tolerates missing badges', () => {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { grantBadges } from '../utils/badges'
 import { supabase } from '../utils/supabase/supabase-client'
+import { ClickerFight } from './clicker-fight'
 import { Leaderboard } from './leaderboard'
 import './clicker.css'
 
@@ -84,6 +85,7 @@ export const Clicker = ({ userId, clickCount, badges, onProgress }: ClickerProps
           Click me
         </button>
       </div>
+      <ClickerFight userId={userId} clickCount={count} />
       <Leaderboard userId={userId} column="click_count" label="Click" ownValue={count} />
     </section>
   )

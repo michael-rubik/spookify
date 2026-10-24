@@ -16,6 +16,7 @@ import { CostumeVisibilityAdmin } from './components/costume-visibility-admin'
 import { badgeDisplayName, CUSTOM_BADGE_MAX_LENGTH, giveCustomBadge, grantBadges } from './utils/badges'
 import { clampPoints, DEFAULT_CUSTOM_POINTS, hasUnseenBadges, MAX_BADGE_POINTS, PASS_BADGES } from './utils/battle-pass'
 import { BattlePass } from './components/battle-pass'
+import { ClickerFightAdmin } from './components/clicker-fight-admin'
 import { BadgePointsAdmin } from './components/badge-points-admin'
 import { formatSpookifyScore } from './utils/spookify'
 import { usePolling } from './utils/use-polling'
@@ -837,6 +838,7 @@ function App() {
               <VotesAdmin />
               <CostumeVisibilityAdmin onChange={() => void reloadUsers()} />
               <SongLimitAdmin />
+              <ClickerFightAdmin />
             </>
           )}
         </section>

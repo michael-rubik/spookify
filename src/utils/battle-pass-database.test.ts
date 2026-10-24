@@ -18,9 +18,10 @@ const migrations = [
   'supabase/migrations/20261035_lock_progress_and_email.sql',
   'supabase/migrations/20261036_unique_costumes.sql',
   'supabase/migrations/20261037_spooker_first_spook.sql',
+  'supabase/migrations/20261042_clicker_fights.sql',
 ].map((path) => readFileSync(path, 'utf8'))
 
-const REGULAR = ['clicker', 'songmaster', 'spooker', 'tagged', 'fan', 'karaoke', 'swipes', 'fmk', 'voter']
+const REGULAR = ['clicker', 'songmaster', 'spooker', 'tagged', 'fan', 'karaoke', 'swipes', 'fmk', 'voter', 'fight-winner']
 
 describe.each([
   { name: 'fresh schema only', applyMigrations: false },
@@ -107,7 +108,7 @@ describe.each([
   it('seeds a point value for every regular badge and Winner winner', async () => {
     await db.exec('reset role')
     const { rows } = await db.query<{ badge_id: string }>('select badge_id from public.badge_points')
-    expect(rows.map((row) => row.badge_id).sort()).toEqual([...REGULAR, 'winner-winner'].sort())
+    expect(rows.map((row) => row.badge_id).sort()).toEqual([...REGULAR, 'winner-winner', 'legacy-winner'].sort())
   })
 
   it('keeps costumes unique ignoring case and spaces, for signup, edits and the pre-check', async () => {
@@ -216,8 +217,8 @@ describe.each([
     expect(await badgesOf(ann)).toContain('voter')
   })
 
-  it('awards Winner winner exactly when all nine regular badges are held', async () => {
-    await db.query('update public.users set badges = $2 where id = $1', [ann, REGULAR.slice(0, 8)])
+  it('awards Winner winner exactly when all ten regular badges are held', async () => {
+    await db.query('update public.users set badges = $2 where id = $1', [ann, REGULAR.slice(0, 9)])
     await progressOf(ann)
     expect(await badgesOf(ann)).not.toContain('winner-winner')
 
