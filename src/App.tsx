@@ -12,6 +12,7 @@ import { Spooks } from './components/spooks'
 import { Spookify } from './components/spookify'
 import { VotesAdmin } from './components/votes-admin'
 import { SongLimitAdmin } from './components/song-limit-admin'
+import { CostumeVisibilityAdmin } from './components/costume-visibility-admin'
 import { badgeDisplayName, CUSTOM_BADGE_MAX_LENGTH, giveCustomBadge, grantBadges } from './utils/badges'
 import { clampPoints, DEFAULT_CUSTOM_POINTS, hasUnseenBadges, MAX_BADGE_POINTS, PASS_BADGES } from './utils/battle-pass'
 import { BattlePass } from './components/battle-pass'
@@ -20,6 +21,7 @@ import { formatSpookifyScore } from './utils/spookify'
 import { usePolling } from './utils/use-polling'
 import { navigate, useRoute } from './utils/use-route'
 import { pathFor, type View } from './utils/routes'
+import { costumeLabel, fetchCostumes, USER_COLUMNS, withCostumes } from './utils/costumes'
 import { getDevAdminUser, getDevSession, isDevLoginEnabled } from './utils/dev-login'
 
 type UserProfile = {
@@ -43,6 +45,14 @@ type ProfileDraft = {
 }
 
 const emptyProfileDraft: ProfileDraft = { name: '', costume: '', email: '' }
+
+const fetchProfiles = async () => {
+  const [{ data, error }, costumes] = await Promise.all([
+    supabase.from('users').select(USER_COLUMNS).order('name', { ascending: true }),
+    fetchCostumes(),
+  ])
+  return { data: error ? null : withCostumes((data ?? []) as unknown as Omit<UserProfile, 'costume'>[], costumes), error }
+}
 
 function readSeenBadges(userId: string | undefined): string[] {
   if (!userId) return []
@@ -142,7 +152,7 @@ function App() {
       // Only the first load shows a loading state; background refetches swap values in silently.
       if (!hasLoadedUsers.current) setLoadingUsers(true)
 
-      const { data, error } = await supabase.from('users').select('*').order('name', { ascending: true })
+      const { data, error } = await fetchProfiles()
       if (isCancelled()) return
 
       if (error) {
@@ -256,14 +266,14 @@ function App() {
           costume: nextCostume,
         })
         .eq('id', session.user.id)
-        .select()
+        .select(USER_COLUMNS)
         .single()
 
       if (error) {
         throw error
       }
 
-      const savedUser = data as UserProfile | null
+      const savedUser = data as unknown as UserProfile | null
 
       setUsers((currentUsers) =>
         currentUsers.map((user) =>
@@ -322,7 +332,7 @@ function App() {
       .from('users')
       .update({ avatar_url: nextAvatarUrl })
       .eq('id', session.user.id)
-      .select()
+      .select(USER_COLUMNS)
       .single()
 
     if (error) {
@@ -331,7 +341,7 @@ function App() {
       return
     }
 
-    const savedUser = data as UserProfile | null
+    const savedUser = data as unknown as UserProfile | null
 
     setUsers((currentUsers) =>
       currentUsers.map((user) =>
@@ -547,7 +557,7 @@ function App() {
       console.error('Account deletion did not complete:', error)
       setDeletionError(error instanceof Error ? error.message : 'Deletion could not be confirmed.')
     } finally {
-      const { data, error } = await supabase.from('users').select('*').order('name', { ascending: true })
+      const { data, error } = await fetchProfiles()
       if (error) {
         console.error('Failed to refresh users after deletion:', error)
         setDeletionError((message) => `${message ? `${message} ` : ''}The user list could not be refreshed. Reload before retrying.`)
@@ -824,6 +834,7 @@ function App() {
 
               <SignupCodes />
               <VotesAdmin />
+              <CostumeVisibilityAdmin onChange={() => void reloadUsers()} />
               <SongLimitAdmin />
             </>
           )}
@@ -903,10 +914,10 @@ function App() {
                     </div>
 
                     {!showAllDetails ? (
-                      <div>{user.costume}</div>
+                      <div>{costumeLabel(user.costume)}</div>
                     ) : (
                       <>
-                        <div>{user.costume}</div>
+                        <div>{costumeLabel(user.costume)}</div>
                         <div>{user.email}</div>
                         <div>Clicks: {user.click_count}</div>
                         <div>

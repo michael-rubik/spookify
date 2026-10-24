@@ -121,6 +121,13 @@ client secret stays on the server; it uses the Client Credentials flow, which re
 the public catalogue only. The app links out to Spotify instead of playing audio, so
 no guest needs a Spotify account.
 
+Apply `20261041_hide_costumes.sql` for the costume switch. `app_settings.costumes_hidden`
+(0/1) is flipped by admins through `set_costumes_hidden(boolean)`; `costumes_hidden()` is
+readable before sign in so the signup form can show it. `users.costume` is no longer
+selectable by clients: they call `visible_costumes()`, which returns everyone's costume
+while shown and only the caller's own while hidden. Select `USER_COLUMNS`
+(`src/utils/costumes.ts`) instead of `*`, and grant any new `users` column explicitly.
+
 ## End-to-end tests
 
 `npm run test:e2e` runs Playwright against a throwaway Postgres + PostgREST in a

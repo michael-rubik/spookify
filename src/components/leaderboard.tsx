@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabase/supabase-client'
 import { isDevLoginEnabled } from '../utils/dev-login'
 import { buildLeaderboard, LEADERBOARD_LIMIT, type LeaderboardUser } from '../utils/leaderboard'
+import { costumeLabel, fetchCostumes, withCostumes } from '../utils/costumes'
 import { formatSpookifyScore } from '../utils/spookify'
 import { usePolling } from '../utils/use-polling'
 import { useEffect, useRef, useState } from 'react'
@@ -21,7 +22,6 @@ type LeaderboardProps = {
 type LeaderboardRecord = {
   id: string
   name: string
-  costume: string
   avatar_url: string | null
 } & Record<string, unknown>
 
@@ -32,10 +32,10 @@ export const Leaderboard = ({ userId, column, label, ownValue, refreshKey }: Lea
 
   const reload = usePolling(
     async (isCancelled) => {
-      const { data, error: loadError } = await supabase
-        .from('users')
-        .select(`id, name, costume, avatar_url, ${column}`)
-        .is('deletion_pending_at', null)
+      const [{ data, error: loadError }, costumes] = await Promise.all([
+        supabase.from('users').select(`id, name, avatar_url, ${column}`).is('deletion_pending_at', null),
+        fetchCostumes(),
+      ])
       if (isCancelled()) return
 
       if (loadError) {
@@ -45,7 +45,7 @@ export const Leaderboard = ({ userId, column, label, ownValue, refreshKey }: Lea
       }
 
       setError('')
-      const records = (data ?? []) as unknown as LeaderboardRecord[]
+      const records = withCostumes((data ?? []) as unknown as LeaderboardRecord[], costumes)
       setUsers(
         records.map(({ id, name, costume, avatar_url, ...rest }) => ({
           id,
@@ -94,7 +94,7 @@ export const Leaderboard = ({ userId, column, label, ownValue, refreshKey }: Lea
               )}
               <span className="leaderboard-text">
                 <strong>{row.name}{row.isOwn ? ' (you)' : ''}</strong>
-                <small>{row.costume}</small>
+                <small>{costumeLabel(row.costume)}</small>
               </span>
               <span className="leaderboard-count">              {formatSpookifyScore(row.value)}</span>
             </span>
