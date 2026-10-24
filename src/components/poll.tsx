@@ -10,6 +10,7 @@ import {
   type TallyRow,
   type VoteRecord,
 } from '../utils/votes'
+import { Costume } from './costume'
 import './poll.css'
 
 export type PollUser = {
@@ -101,13 +102,13 @@ function VoteChart({ bars, revealed, label }: { bars: ChartBar[]; revealed: bool
                 <span className="vote-chart-text">
                   {revealed ? (
                     <>
-                      <strong>{bar.isWinner ? '🏆 ' : ''}{bar.user?.costume ?? bar.label}</strong>
+                      <strong>{bar.isWinner ? '🏆 ' : ''}{bar.user?.costume || bar.label}</strong>
                       <small>{bar.user?.name}</small>
                     </>
                   ) : inspected ? (
                     <>
                       <strong>{bar.user?.name}</strong>
-                      <small>{bar.user?.costume}</small>
+                      <small>{<Costume costume={bar.user?.costume} />}</small>
                     </>
                   ) : (
                     <strong>{bar.label}</strong>
@@ -177,7 +178,7 @@ function BallotForm({ vote, candidates, onVoted }: { vote: VoteRecord; candidate
             <Avatar user={candidate} />
             <span className="candidate-text">
               <strong>{candidate.name}</strong>
-              <small>{candidate.costume}</small>
+              <small>{<Costume costume={candidate.costume} />}</small>
             </span>
           </label>
         ))}
@@ -232,7 +233,7 @@ function VoteCard({ vote, users, currentUserId, hasVoted, progress, tallies, onV
       const user = users.find((candidate) => candidate.id === entry.candidate_id)
       return {
         id: entry.candidate_id,
-        label: user?.costume ?? 'Unknown costume',
+        label: user?.costume || 'Unknown costume',
         fraction: entry.ballots / top,
         user,
         ballots: entry.ballots,

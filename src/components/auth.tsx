@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { supabase } from '../utils/supabase/supabase-client'
 import { isDevLoginEnabled } from '../utils/dev-login'
@@ -38,6 +38,19 @@ export const Auth = ({ onDevLogin }: AuthProps) => {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [costumesHidden, setCostumesHidden] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    if (isDevLoginEnabled()) return
+    let cancelled = false
+    void supabase.rpc('costumes_hidden').then(({ data }) => {
+      if (!cancelled && typeof data === 'boolean') setCostumesHidden(data)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleDevLogin = () => {
     if (!isDevLoginEnabled()) {
@@ -191,6 +204,14 @@ export const Auth = ({ onDevLogin }: AuthProps) => {
             onChange={updateField('costume')}
             required
           />
+        )}
+
+        {mode === 'sign-up' && costumesHidden !== null && (
+          <div className="auth-hint" data-testid="costume-visibility-hint">
+            {costumesHidden
+              ? 'Costumes are currently hidden: only you will see your own costume.'
+              : 'Costumes are currently visible to everyone.'}
+          </div>
         )}
 
         <input
