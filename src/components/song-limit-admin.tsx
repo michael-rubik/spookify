@@ -75,19 +75,6 @@ const LevelRow = ({ level, position, disabled, onSave, onDelete }: LevelRowProps
           onBlur={commit}
         />
       </label>
-      <label className="row">
-        <span className="muted">Reward: bonus fights</span>
-        <input
-          type="number"
-          min={0}
-          max={MAX_LEVEL_BONUS_FIGHTS}
-          disabled={disabled}
-          aria-label={`Reward (bonus fights) for milestone ${position}`}
-          value={fights ?? String(level.bonus_fights)}
-          onChange={(event) => setFights(event.target.value)}
-          onBlur={commit}
-        />
-      </label>
       <button type="button" disabled={disabled} onClick={() => onDelete(level)}>
         Delete
       </button>
