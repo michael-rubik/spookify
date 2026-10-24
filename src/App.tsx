@@ -13,6 +13,7 @@ import { Spookify } from './components/spookify'
 import { VotesAdmin } from './components/votes-admin'
 import { SongLimitAdmin } from './components/song-limit-admin'
 import { CostumeVisibilityAdmin } from './components/costume-visibility-admin'
+import { KaraokeToggleAdmin } from './components/karaoke-toggle-admin'
 import { badgeDisplayName, CUSTOM_BADGE_MAX_LENGTH, giveCustomBadge, grantBadges } from './utils/badges'
 import { clampPoints, DEFAULT_CUSTOM_POINTS, hasUnseenBadges, MAX_BADGE_POINTS, PASS_BADGES } from './utils/battle-pass'
 import { BattlePass } from './components/battle-pass'
@@ -91,6 +92,7 @@ function App() {
   const view = route.view
   const setView = (nextView: View) => navigate(pathFor(nextView))
   const [hasVotes, setHasVotes] = useState(false)
+  const [karaokeEnabled, setKaraokeEnabled] = useState(true)
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>(emptyProfileDraft)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [profileError, setProfileError] = useState('')
@@ -186,6 +188,17 @@ function App() {
     pollingEnabled,
   )
 
+
+  // Karaoke stays on until an admin turns it off; a failed check keeps the last known state.
+  const reloadKaraoke = usePolling(
+    async (isCancelled) => {
+      const { data, error } = await supabase.rpc('karaoke_enabled')
+      if (isCancelled() || error || typeof data !== 'boolean') return
+      setKaraokeEnabled(data)
+    },
+    15000,
+    pollingEnabled && accountStatus === 'active',
+  )
 
   const handleLogout = async () => {
     if (isDevLoginEnabled()) {
@@ -599,7 +612,7 @@ function App() {
 
   const navItems: { key: View; label: string; icon: string }[] = [
     { key: 'spooks', label: 'Spooks', icon: '🎃' },
-    { key: 'karaoke', label: 'Karaoke', icon: '🎤' },
+    ...(karaokeEnabled ? [{ key: 'karaoke' as const, label: 'Karaoke', icon: '🎤' }] : []),
     ...(isDevLoginEnabled() ? [] : [{ key: 'spookify' as const, label: 'Spookify', icon: '🎧' }]),
     { key: 'battlepass', label: 'Pass', icon: '🏆' },
     ...(hasVotes ? [{ key: 'poll' as const, label: 'Poll', icon: '🗳️' }] : []),
@@ -643,13 +656,15 @@ function App() {
             >
               Spooks
             </button>
-            <button
-              type="button"
-              className={`nav-button${view === 'karaoke' ? ' is-active' : ''}`}
-              onClick={() => setView('karaoke')}
-            >
-              Karaoke
-            </button>
+            {karaokeEnabled && (
+              <button
+                type="button"
+                className={`nav-button${view === 'karaoke' ? ' is-active' : ''}`}
+                onClick={() => setView('karaoke')}
+              >
+                Karaoke
+              </button>
+            )}
             {!isDevLoginEnabled() && (
               <button
                 type="button"
@@ -837,6 +852,7 @@ function App() {
               <SignupCodes />
               <VotesAdmin />
               <CostumeVisibilityAdmin onChange={() => void reloadUsers()} />
+              <KaraokeToggleAdmin onChange={() => void reloadKaraoke()} />
               <SongLimitAdmin />
               <ClickerFightAdmin />
             </>
@@ -969,7 +985,14 @@ function App() {
       ) : view === 'spooks' ? (
         <Spooks users={users} currentUserId={session.user.id} isAdmin={isCurrentUserAdmin} />
       ) : view === 'karaoke' ? (
-        <Karaoke currentUserId={session.user.id} isCurrentUserAdmin={isCurrentUserAdmin} />
+        karaokeEnabled ? (
+          <Karaoke currentUserId={session.user.id} isCurrentUserAdmin={isCurrentUserAdmin} />
+        ) : (
+          <section className="page-section">
+            <h2>Karaoke</h2>
+            <p className="muted" data-testid="karaoke-disabled">🎤 Karaoke is turned off right now.</p>
+          </section>
+        )
       ) : view === 'poll' ? (
         <Poll currentUserId={session.user.id} users={users} />
       ) : view === 'spookify' ? (

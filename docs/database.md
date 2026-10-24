@@ -127,6 +127,10 @@ daily limits (`my_fmk_skips` reports them). A user's own songs may be dealt; vot
 song and its submitter half (sing 0.5, listen 0.25) while the tier gain stays full. That quarter point
 is why the score columns and `spookify_songs.points` are `numeric(8,2)`.
 
+Apply `20261048_karaoke_toggle.sql` to let admins turn karaoke off. `app_settings.karaoke_enabled`
+(default on) is read with `karaoke_enabled()` and written by the admin-only `set_karaoke_enabled`;
+while it is off the app hides the Karaoke view and the insert policy on `karaoke_queue` refuses new songs.
+
 Searching Spotify goes through the `spookify-search` Edge Function so the Spotify
 client secret stays on the server; it uses the Client Credentials flow, which reaches
 the public catalogue only. The app links out to Spotify instead of playing audio, so
