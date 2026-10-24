@@ -254,6 +254,25 @@ describe.each([
       expect(await scoreOf(ben, 'submitter_score')).toBe(0.5)
     })
 
+    it('is wiped, with the add-song points, by the one-off reset while songs and tinder stay', async () => {
+      const [first, second, third] = await addThree()
+      await swipe(cat, first, 'right')
+      await nextFmk(ben)
+      await submit(ben, first, second, third)
+      await db.exec('reset role')
+      await db.exec(readFileSync('supabase/migrations/20261046_reset_fmk_and_add_song_points.sql', 'utf8'))
+      expect(await scoreOf(ben, 'fmk_score')).toBe(0)
+      expect(await scoreOf(ann, 'submitter_score')).toBe(0)
+      expect(await scoreOf(cat)).toBe(1)
+      expect(await songPoints(first)).toBe(0)
+      const { rows } = await db.query<{ songs: number; tiers: number; trios: number }>(`
+        select (select count(*)::int from public.spookify_songs) as songs,
+               (select count(*)::int from public.spookify_fmk_tiers) as tiers,
+               (select count(*)::int from public.spookify_fmk_trios) as trios`)
+      expect(rows[0]).toEqual({ songs: 3, tiers: 0, trios: 0 })
+      expect(await nextFmk(ben)).toHaveLength(3)
+    })
+
     describe('skips', () => {
       const skip = async (user: string) => {
         await asUser(user)
