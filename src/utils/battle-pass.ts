@@ -21,7 +21,7 @@ export const PASS_BADGES: readonly PassBadge[] = [
   { id: 'songmaster', title: 'Songmaster', goal: 'Collect 100 Spookify points', target: 100, message: SONGMASTER_BADGE.message, defaultPoints: 200 },
   { id: 'spooker', title: 'Spooker', goal: 'Post your first spook', target: 1, message: 'Dein erster Spook! Der Feed gehört dir.', defaultPoints: 100 },
   { id: 'tagged', title: 'Popular', goal: 'Get tagged in 10 spooks by others', target: 10, message: 'Alle wollen dich auf ihren Fotos haben.', defaultPoints: 200 },
-  { id: 'fan', title: 'Fan favourite', goal: 'Get 10 tinder likes on the songs you added', target: 10, message: 'Dein Song ist ein echter Hit.', defaultPoints: 300 },
+  { id: 'fan', title: 'Fan favourite', goal: 'Get 10 swipes right on one song you added', target: 10, message: 'Dein Song ist ein echter Hit.', defaultPoints: 300 },
   { id: 'karaoke', title: 'Karaoke star', goal: 'Perform 3 karaoke songs', target: 3, message: 'Das Mikrofon gehört dir.', defaultPoints: 100 },
   { id: 'swipes', title: 'Swipe marathon', goal: 'Swipe 50 songs in Spookify Tinder', target: 50, message: 'Dein Daumen braucht eine Pause.', defaultPoints: 200 },
   { id: 'fmk', title: 'FMK veteran', goal: 'Finish 25 FMK rounds', target: 25, message: 'Du hast schwere Entscheidungen getroffen.', defaultPoints: 300 },

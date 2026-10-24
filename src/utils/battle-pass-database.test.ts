@@ -19,7 +19,6 @@ const migrations = [
   'supabase/migrations/20261036_unique_costumes.sql',
   'supabase/migrations/20261037_spooker_first_spook.sql',
   'supabase/migrations/20261042_clicker_fights.sql',
-  'supabase/migrations/20261049_fan_badge_total_likes.sql',
 ].map((path) => readFileSync(path, 'utf8'))
 
 const REGULAR = ['clicker', 'songmaster', 'spooker', 'tagged', 'fan', 'karaoke', 'swipes', 'fmk', 'voter', 'fight-winner']

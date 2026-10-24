@@ -14,7 +14,7 @@
 
 **Badge message** — The text attached to a badge, visible only to its owner on the battle pass while the badge is held. Locked badges show only their goal and progress.
 
-**Regular badge** — One of the ten built-in badges with a condition: clicks, Spookify score, spooks posted, being tagged, tinder likes (right swipes) on the songs you added, karaoke songs performed (3), Spookify Tinder swipes (50), FMK rounds finished (25), casting a ballot and winning a clicker fight (200 XP by default). Not custom badges or winner badges.
+**Regular badge** — One of the ten built-in badges with a condition: clicks, Spookify score, spooks posted, being tagged, right swipes on one song, karaoke songs performed (3), Spookify Tinder swipes (50), FMK rounds finished (25), casting a ballot and winning a clicker fight (200 XP by default). Not custom badges or winner badges.
 
 **Winner winner** — The final badge, with the message "chicken dinner". Earned when a user holds every regular badge, that is, the full regular XP. Custom badges, winner badges and the legacy badge never count towards it.
 
