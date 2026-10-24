@@ -235,7 +235,7 @@ function App() {
         await reloadUsers()
       }
     },
-    15000,
+    view === 'battlepass' ? 4000 : 15000,
     pollingEnabled && accountStatus === 'active',
   )
 
