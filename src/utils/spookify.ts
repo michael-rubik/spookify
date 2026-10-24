@@ -57,11 +57,18 @@ export function fmkAssignmentComplete(
     && new Set(chosen).size === FMK_CHOICES.length
 }
 
-// Scores move in halves, and PostgREST can hand a numeric column back as a string.
+// Scores move in quarters, and PostgREST can hand a numeric column back as a string.
 export function formatSpookifyScore(score: number | string | null | undefined): string {
   const value = typeof score === 'string' ? Number.parseFloat(score) : (score ?? 0)
   if (!Number.isFinite(value)) return '0'
-  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+  return String(Number(value.toFixed(2)))
+}
+
+export type FmkSkips = { skips_left: number; skips_total: number }
+
+export function describeFmkSkips({ skips_left, skips_total }: FmkSkips): string {
+  if (skips_total === 0) return 'Unlock skips by reaching battle pass milestones.'
+  return `${skips_left} of ${skips_total} skips left today.`
 }
 
 export type SearchResult = {
@@ -82,7 +89,11 @@ export function describeSpookifyError(error: { message?: string | null } | null 
   if (message.includes('Song already added')) return SONG_ALREADY_ADDED_MESSAGE
   if (message.includes('Daily song limit')) return DAILY_LIMIT_MESSAGE
   if (message.includes('already swiped')) return 'You have already swiped on this song.'
-  if (message.includes('choose your own')) return 'You cannot choose your own song.'
+  if (message.includes('No skips left')) return 'No skips left today. Limits reset at midnight.'
+  if (message.includes('no other trio')) return 'There is no other trio to skip to yet.'
+  if (message.includes('not your current trio') || message.includes('no trio to skip')) {
+    return 'That round is no longer valid. Loading a new one.'
+  }
   if (message.includes('your own song')) return 'You cannot swipe on your own song.'
   if (message.includes('three different songs')) return 'Give each song a different choice.'
   if (message.includes('already deleted')) return 'One of those songs was already deleted.'

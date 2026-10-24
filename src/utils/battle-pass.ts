@@ -134,11 +134,12 @@ export function computeXp({ heldIds, points, customPoints, voteWinnerPoints }: X
 export const clampPoints = (value: number): number =>
   Number.isFinite(value) ? Math.min(MAX_BADGE_POINTS, Math.max(0, Math.trunc(value))) : 0
 
-export type PassLevel = { id: string; xp_required: number; bonus_songs: number; bonus_fights: number }
+export type PassLevel = { id: string; xp_required: number; bonus_songs: number; bonus_fights: number; fmk_skips: number }
 
 export const MAX_LEVEL_XP = 100000
 export const MAX_LEVEL_BONUS_SONGS = 100
 export const MAX_LEVEL_BONUS_FIGHTS = 100
+export const MAX_LEVEL_FMK_SKIPS = 100
 
 // The bar ends at the larger of the badge total and the highest milestone, so no reward icon falls off it.
 export const passScale = (trackTotal: number, levels: readonly PassLevel[]): number =>
@@ -152,6 +153,7 @@ export type RewardGroup = {
   positionPercent: number
   bonusSongs: number
   bonusFights: number
+  fmkSkips: number
   milestones: PassLevel[]
   reachedCount: number
 }
@@ -174,6 +176,7 @@ export function rewardGroups(levels: readonly PassLevel[], xp: number, scale: nu
     positionPercent: percentOf(milestones[0]),
     bonusSongs: milestones.reduce((sum, entry) => sum + entry.bonus_songs, 0),
     bonusFights: milestones.reduce((sum, entry) => sum + entry.bonus_fights, 0),
+    fmkSkips: milestones.reduce((sum, entry) => sum + entry.fmk_skips, 0),
     milestones,
     reachedCount: milestones.filter((entry) => entry.xp_required <= xp).length,
   }))
@@ -183,6 +186,7 @@ export function describeRewardGroup(group: RewardGroup): string {
   const perks = [
     group.bonusSongs > 0 ? `+${group.bonusSongs} ${group.bonusSongs === 1 ? 'song' : 'songs'} per day` : '',
     group.bonusFights > 0 ? `+${group.bonusFights} ${group.bonusFights === 1 ? 'fight' : 'fights'} per day` : '',
+    group.fmkSkips > 0 ? `+${group.fmkSkips} FMK ${group.fmkSkips === 1 ? 'skip' : 'skips'} per day` : '',
   ].filter(Boolean)
   const songs = perks.length > 0 ? perks.join(', ') : 'No perk'
   const { milestones, reachedCount } = group
@@ -199,6 +203,7 @@ export type LevelStatus = {
   level: number
   bonusSongs: number
   bonusFights: number
+  fmkSkips: number
   next: PassLevel | null
 }
 
@@ -210,6 +215,7 @@ export function levelStatus(xp: number, levels: readonly PassLevel[]): LevelStat
     level: reached.length,
     bonusSongs: reached.reduce((sum, entry) => sum + entry.bonus_songs, 0),
     bonusFights: reached.reduce((sum, entry) => sum + entry.bonus_fights, 0),
+    fmkSkips: reached.reduce((sum, entry) => sum + entry.fmk_skips, 0),
     next: sorted.find((entry) => entry.xp_required > xp) ?? null,
   }
 }

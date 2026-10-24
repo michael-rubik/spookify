@@ -14,6 +14,7 @@ const migrations = [
   'supabase/migrations/20261031_spookify_game_scores.sql',
   'supabase/migrations/20261032_spookify_song_points.sql',
   'supabase/migrations/20261033_songmaster_badge.sql',
+  'supabase/migrations/20261045_fmk_trio_skips_own_songs.sql',
 ].map((path) => readFileSync(path, 'utf8'))
 
 describe.each([
@@ -136,17 +137,18 @@ describe.each([
       await addSong(ann, 'a3'),
     ]
 
-    it('offers nothing until three songs from other submitters exist', async () => {
+    it('offers nothing until three songs exist, own songs included', async () => {
       await addSong(ann, 'a1')
       await addSong(ann, 'a2')
       expect(await nextFmk(ben)).toEqual([])
       await addSong(ann, 'a3')
-      expect(await nextFmk(ann)).toEqual([])
+      expect(await nextFmk(ann)).toHaveLength(3)
       expect(await nextFmk(ben)).toHaveLength(3)
     })
 
     it('pays the player a point and the submitter for sing and listen, and tiers the songs', async () => {
       const [first, second, third] = await addThree()
+      await nextFmk(ben)
       await submit(ben, first, second, third)
       expect(await scoreOf(ben, 'fmk_score')).toBe(1)
       expect(await scoreOf(ben)).toBe(1)
@@ -171,6 +173,7 @@ describe.each([
 
     it('never matches songs that already faced each other and keeps tiers per user', async () => {
       const [first, second, third] = await addThree()
+      await nextFmk(ben)
       await submit(ben, first, second, third)
       expect(await nextFmk(ben)).toEqual([])
       expect(await nextFmk(cat)).toHaveLength(3)
@@ -183,22 +186,126 @@ describe.each([
         await addSong(ann, 'a5'),
         await addSong(ann, 'a6'),
       ]
-      const [one, two, three, four, five, six] = songs
-      await submit(ben, one, two, three)
+      const dealt = (await nextFmk(ben)).map((row) => row.id)
+      await submit(ben, dealt[0], dealt[1], dealt[2])
       const round = await nextFmk(ben)
-      expect(round.map((row) => row.id).sort()).toEqual([four, five, six].sort())
+      expect(round.map((row) => row.id).sort()).toEqual(songs.filter((id) => !dealt.includes(id)).sort())
       expect(new Set(round.map((row) => row.tier))).toEqual(new Set([0]))
     })
 
-    it('rejects own songs, repeats, mixed tiers and deleted songs', async () => {
+    it('keeps the dealt trio, in the same order, until it is locked in', async () => {
+      await addThree()
+      await addSong(ann, 'a4')
+      const first = (await nextFmk(ben)).map((row) => row.id)
+      for (let i = 0; i < 5; i++) expect((await nextFmk(ben)).map((row) => row.id)).toEqual(first)
+      await submit(ben, first[0], first[1], first[2])
+      expect((await nextFmk(ben)).map((row) => row.id)).not.toEqual(first)
+    })
+
+    it('deals a new trio when a song of the dealt one disappears', async () => {
+      const songs = [...(await addThree()), await addSong(ann, 'a4')]
+      const dealt = (await nextFmk(ben)).map((row) => row.id)
+      await db.exec('reset role')
+      await db.query('delete from public.spookify_songs where id = $1', [dealt[0]])
+      const round = (await nextFmk(ben)).map((row) => row.id)
+      expect(round.sort()).toEqual(songs.filter((id) => id !== dealt[0]).sort())
+    })
+
+    it('only locks in the dealt trio, and rejects repeats and bad input', async () => {
       const [first, second, third] = await addThree()
-      await submit(ben, first, second, third)
-      const [one, two, three] = [first, second, third]
-      await expect(submit(ben, one, two, three)).rejects.toThrow('already deleted')
-      await expect(submit(cat, one, one, two)).rejects.toThrow('three different songs')
-      await expect(submit(ann, one, two, three)).rejects.toThrow('own song')
       const fourth = await addSong(cat, 'c1')
-      await expect(submit(ben, one, two, fourth)).rejects.toThrow('not in the same tier')
+      await expect(submit(ben, first, second, third)).rejects.toThrow('not your current trio')
+      const dealt = (await nextFmk(ben)).map((row) => row.id)
+      await expect(submit(ben, dealt[0], dealt[0], dealt[1])).rejects.toThrow('three different songs')
+      const outsider = [first, second, third, fourth].find((id) => !dealt.includes(id))!
+      await expect(submit(ben, dealt[0], dealt[1], outsider)).rejects.toThrow('not your current trio')
+      await submit(ben, dealt[0], dealt[1], dealt[2])
+      await expect(submit(ben, dealt[0], dealt[1], dealt[2])).rejects.toThrow('not your current trio')
+    })
+
+    it('deals your own songs and pays half for voting on them, with full tier gains', async () => {
+      const [first, second, third] = [
+        await addSong(ann, 'a1'),
+        await addSong(ann, 'a2'),
+        await addSong(ann, 'a3'),
+      ]
+      await nextFmk(ann)
+      await submit(ann, first, second, third)
+      expect(await songPoints(first)).toBe(0.5)
+      expect(await songPoints(second)).toBe(0.25)
+      expect(await scoreOf(ann, 'submitter_score')).toBe(0.75)
+      expect(await scoreOf(ann, 'fmk_score')).toBe(1)
+      expect(await scoreOf(ann)).toBe(1.75)
+      await db.exec('reset role')
+      const { rows } = await db.query<{ song_id: string; points: number }>(
+        'select song_id, points from public.spookify_fmk_tiers where user_id = $1 and not deleted', [ann],
+      )
+      expect(Object.fromEntries(rows.map((row) => [row.song_id, row.points]))).toEqual({ [first]: 2, [second]: 1 })
+    })
+
+    it('pays half only for the own song when a trio mixes own and other songs', async () => {
+      const own = await addSong(ben, 'b1')
+      const others = [await addSong(ann, 'a1'), await addSong(ann, 'a2')]
+      await nextFmk(ben)
+      await submit(ben, own, others[0], others[1])
+      expect(await songPoints(own)).toBe(0.5)
+      expect(await songPoints(others[0])).toBe(0.5)
+      expect(await scoreOf(ann, 'submitter_score')).toBe(0.5)
+      expect(await scoreOf(ben, 'submitter_score')).toBe(0.5)
+    })
+
+    describe('skips', () => {
+      const skip = async (user: string) => {
+        await asUser(user)
+        await db.query('select public.skip_spookify_fmk()')
+      }
+      const skipsOf = async (user: string) => {
+        await asUser(user)
+        const { rows } = await db.query<{ skips_left: number; skips_total: number }>('select * from public.my_fmk_skips()')
+        return rows[0]
+      }
+      const grantSkips = (count: number) =>
+        db.exec(`reset role; insert into public.battle_pass_levels (xp_required, bonus_songs, bonus_fights, fmk_skips)
+          values (0, 0, 0, ${count}) on conflict (xp_required) do update set fmk_skips = ${count}`)
+
+      beforeEach(async () => {
+        await db.exec('reset role; delete from public.battle_pass_levels where xp_required = 0; update public.battle_pass_levels set fmk_skips = 0')
+        await db.exec("update public.app_settings set int_value = 0 where key = 'limits_reset_at'")
+      })
+
+      it('are locked until a milestone grants them', async () => {
+        await addThree()
+        await addSong(ann, 'a4')
+        await nextFmk(ben)
+        expect(await skipsOf(ben)).toEqual({ skips_left: 0, skips_total: 0 })
+        await expect(skip(ben)).rejects.toThrow('No skips left today')
+      })
+
+      it('swap the trio for a different one, spend a skip and reset with the daily limits', async () => {
+        const songs = [...(await addThree()), await addSong(ann, 'a4'), await addSong(ann, 'a5')]
+        await grantSkips(1)
+        const before = (await nextFmk(ben)).map((row) => row.id)
+        await skip(ben)
+        const after = (await nextFmk(ben)).map((row) => row.id)
+        expect([...after].sort()).not.toEqual([...before].sort())
+        expect(after.every((id) => songs.includes(id))).toBe(true)
+        expect(await skipsOf(ben)).toEqual({ skips_left: 0, skips_total: 1 })
+        await expect(skip(ben)).rejects.toThrow('No skips left today')
+
+        await asUser(admin)
+        await db.query('select public.reset_daily_limits()')
+        expect(await skipsOf(ben)).toEqual({ skips_left: 1, skips_total: 1 })
+        await skip(ben)
+      })
+
+      it('fail without spending a skip when there is no other trio', async () => {
+        await addThree()
+        await grantSkips(2)
+        const before = (await nextFmk(ben)).map((row) => row.id)
+        await expect(skip(ben)).rejects.toThrow('no other trio')
+        expect((await nextFmk(ben)).map((row) => row.id)).toEqual(before)
+        expect(await skipsOf(ben)).toEqual({ skips_left: 2, skips_total: 2 })
+      })
     })
 
     it('does not let a client write tiers or pairs directly', async () => {

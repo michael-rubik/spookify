@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { supabase } from '../utils/supabase/supabase-client'
 import {
+  describeFmkSkips,
   describeSongAllowance,
   describeSpookifyError,
   fmkAssignmentComplete,
@@ -10,6 +11,7 @@ import {
   markAlreadyAdded,
   SONG_ALREADY_ADDED_MESSAGE,
   type FmkChoice,
+  type FmkSkips,
   type FmkSong,
   type SearchResult,
   type SongAllowance,
@@ -89,6 +91,8 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
 
   const [fmkSongs, setFmkSongs] = useState<FmkSong[]>([])
   const [maxTier, setMaxTier] = useState(0)
+  const [skips, setSkips] = useState<FmkSkips | null>(null)
+  const [isSkipping, setIsSkipping] = useState(false)
   const [assignment, setAssignment] = useState<Record<string, FmkChoice | undefined>>({})
   const [isLoadingFmk, setIsLoadingFmk] = useState(true)
   const [isSubmittingFmk, setIsSubmittingFmk] = useState(false)
@@ -120,9 +124,10 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
     let cancelled = false
 
     const loadFmk = async () => {
-      const [round, max] = await Promise.all([
+      const [round, max, skipRows] = await Promise.all([
         supabase.rpc('next_spookify_fmk'),
         supabase.rpc('spookify_fmk_max_tier'),
+        supabase.rpc('my_fmk_skips'),
       ])
       if (cancelled) return
 
@@ -130,6 +135,7 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
       setFmkSongs(round.error ? [] : ((round.data ?? []) as FmkSong[]))
       setAssignment({})
       setMaxTier(typeof max.data === 'number' ? max.data : 0)
+      setSkips(skipRows.error ? null : (((skipRows.data ?? []) as FmkSkips[])[0] ?? null))
       setIsLoadingFmk(false)
     }
 
@@ -291,6 +297,16 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
     }
     refreshScores()
     await Promise.all([reloadFmkRef.current(), reloadRef.current()])
+  }
+
+  const handleSkipFmk = async () => {
+    if (isSkipping || isSubmittingFmk) return
+    setIsSkipping(true)
+    setFmkError('')
+    const { error } = await supabase.rpc('skip_spookify_fmk')
+    await reloadFmkRef.current()
+    setIsSkipping(false)
+    if (error) setFmkError(describeSpookifyError(error))
   }
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -500,11 +516,11 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
         <div className="card stack spookify-fmk">
           <GameNote gameId="fmk">
             Every round you play earns +1. The person who added the song you sing earns +1, and the one you listen to
-            earns +0.5.
+            earns +0.5. Your own songs can show up too, but they pay only half.
           </GameNote>
           <p className="muted">
             Give each song a different choice: sing, listen or delete. Sing and listen move a song up a tier; delete
-            removes it from your rounds.
+            removes it from your rounds. You keep this trio until you lock it in{skips && skips.skips_total > 0 ? ' or skip it' : ''}.
           </p>
           <p className="row spookify-fmk-tiers" data-testid="spookify-fmk-tiers">
             <span className="pill">Current tier {fmkSongs[0]?.tier ?? '–'}</span>
@@ -531,7 +547,10 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
                     <Artwork track={fmkSong} />
                     <span className="spookify-result-text">
                       <strong>{fmkSong.title}</strong>
-                      <small>{fmkSong.artist}</small>
+                      <small>
+                        {fmkSong.artist}
+                        {fmkSong.added_by === currentUserId && ' · 🎃 your song, pays half'}
+                      </small>
                     </span>
                     <span className="row spookify-fmk-choices" role="group" aria-label={`Choice for ${fmkSong.title}`}>
                       {FMK_CHOICES.map((choice) => (
@@ -557,6 +576,19 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
               >
                 {isSubmittingFmk ? 'Saving...' : 'Lock in'}
               </button>
+              {skips && (
+                <p className="row">
+                  <button
+                    type="button"
+                    data-testid="skip-fmk"
+                    disabled={isSkipping || isSubmittingFmk || skips.skips_left <= 0}
+                    onClick={() => void handleSkipFmk()}
+                  >
+                    {isSkipping ? 'Skipping...' : '⏭️ Skip trio'}
+                  </button>
+                  <span className="muted" data-testid="fmk-skips-left">{describeFmkSkips(skips)}</span>
+                </p>
+              )}
             </>
           )}
           <Leaderboard userId={currentUserId} column="fmk_score" label="Spookify FMK" refreshKey={scoreVersion} />

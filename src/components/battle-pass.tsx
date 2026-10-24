@@ -39,7 +39,7 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
       supabase.from('badge_points').select('badge_id, points'),
       supabase.from('custom_badge_points').select('label, points'),
       supabase.from('vote_winners').select('vote_id, votes(category, winner_points)').eq('user_id', userId),
-      supabase.from('battle_pass_levels').select('id, xp_required, bonus_songs, bonus_fights'),
+      supabase.from('battle_pass_levels').select('id, xp_required, bonus_songs, bonus_fights, fmk_skips'),
       ])
     if (isCancelled()) return
 
@@ -73,14 +73,19 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
   })
   const scale = passScale(trackTotal, levels)
   const fill = Math.min(100, (xp / scale) * 100)
-  const { level, bonusSongs, bonusFights, next } = levelStatus(xp, levels)
+  const { level, bonusSongs, bonusFights, fmkSkips, next } = levelStatus(xp, levels)
   const perks = [
     bonusSongs > 0 ? `+${bonusSongs} bonus songs` : '',
     bonusFights > 0 ? `+${bonusFights} bonus fights` : '',
+    fmkSkips > 0 ? `+${fmkSkips} FMK skips` : '',
   ].filter(Boolean)
   const perkSummary = perks.length > 0 ? `${perks.join(', ')} per day` : 'No bonus perks yet'
   const nextPerks = next
-    ? [next.bonus_songs > 0 ? `+${next.bonus_songs} songs` : '', next.bonus_fights > 0 ? `+${next.bonus_fights} fights` : '']
+    ? [
+        next.bonus_songs > 0 ? `+${next.bonus_songs} songs` : '',
+        next.bonus_fights > 0 ? `+${next.bonus_fights} fights` : '',
+        next.fmk_skips > 0 ? `+${next.fmk_skips} FMK skips` : '',
+      ]
         .filter(Boolean)
         .join(', ')
     : ''
@@ -140,7 +145,11 @@ export const BattlePass = ({ userId, badges, progress }: BattlePassProps) => {
                   onBlur={() => setActiveReward((current) => (current === group.key ? null : current))}
                   onClick={() => setActiveReward((current) => (current === group.key ? null : group.key))}
                 >
-                  {group.bonusSongs === 0 && group.bonusFights > 0 ? '⚔️' : '🎵'}
+                  {group.bonusSongs === 0 && group.bonusFights === 0 && group.fmkSkips > 0
+                    ? '⏭️'
+                    : group.bonusSongs === 0 && group.bonusFights > 0
+                      ? '⚔️'
+                      : '🎵'}
                 </button>
                 {activeReward === group.key && (
                   <span role="tooltip" className={`battle-pass-tooltip${edge}`} data-testid="pass-reward-tooltip">

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DAILY_LIMIT_MESSAGE,
   describeSongAllowance,
+  describeFmkSkips,
   describeSpookifyError,
   fmkAssignmentComplete,
   fmkSubmitterReward,
@@ -62,17 +63,24 @@ describe('fmk', () => {
     expect(fmkAssignmentComplete(ids, { a: 'sing', b: 'sing', c: 'delete' })).toBe(false)
   })
 
-  it('explains an own-song choice as an FMK error, not a swipe error', () => {
-    expect(describeSpookifyError({ message: 'You cannot choose your own song' })).toBe('You cannot choose your own song.')
+  it('keeps the own-song swipe error separate from FMK errors and explains skip errors', () => {
+    expect(describeSpookifyError({ message: 'You cannot swipe on your own song' })).toBe('You cannot swipe on your own song.')
+    expect(describeSpookifyError({ message: 'No skips left today' })).toContain('No skips left')
+    expect(describeSpookifyError({ message: 'These songs are not your current trio' })).toContain('no longer valid')
+  })
+
+  it('describes the skips left, or how to unlock them', () => {
+    expect(describeFmkSkips({ skips_left: 1, skips_total: 3 })).toBe('1 of 3 skips left today.')
+    expect(describeFmkSkips({ skips_left: 0, skips_total: 0 })).toContain('Unlock skips')
   })
 })
 
 describe('formatSpookifyScore', () => {
-  it('keeps halves visible, drops trailing zeros and survives numeric strings from PostgREST', () => {
+  it('keeps quarters visible, drops trailing zeros and survives numeric strings from PostgREST', () => {
     expect(formatSpookifyScore(3.5)).toBe('3.5')
     expect(formatSpookifyScore(4)).toBe('4')
-    expect(formatSpookifyScore('2.5')).toBe('2.5')
-    expect(formatSpookifyScore('7.0')).toBe('7')
+    expect(formatSpookifyScore('2.25')).toBe('2.25')
+    expect(formatSpookifyScore('7.00')).toBe('7')
   })
 
   it('falls back to zero for missing or unreadable values', () => {

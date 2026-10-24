@@ -59,6 +59,10 @@ _Avoid_: Battle, duel
 
 **Bonus fights** — The extra fights per day a reward adds to the daily fight limit. Stack across all unlocked rewards.
 
+**FMK skips** — The extra skips per day a reward adds, which let a user swap their dealt trio for another one. The base is none; they stack across all unlocked rewards, count as a daily limit and reset with the others.
+
+**Dealt trio** — The three songs a user is currently shown in Spookify FMK. It stays the same across refreshes and devices until the user locks it in or skips it, and is replaced if one of its songs disappears.
+
 **Fight winner** — The fighter with the highest fight score when a clicker fight ends; ties all win. A fight needs at least two fighters to have winners. Earns the "Win your first clicker fight" badge if they lack it.
 
 **Vote** — A named, admin-run event in which users pick their favourite costume for a category. Open until an admin ends it; then it is ended and its results are public.
@@ -97,7 +101,7 @@ _Avoid_: Poll (for the event), election
 
 **Spookify FMK score** — Points a user earns by playing FMKs: one point per round.
 
-**Spookify FMK** — The place where a user is shown three pool songs of the same tier and gives each a different choice. A user never meets their own songs. Unrelated to Spookify Tinder: an FMK choice is not a swipe.
+**Spookify FMK** — The place where a user is shown three pool songs of the same tier and gives each a different choice. A user's own songs may be dealt to them, and voting on one pays half (the song and its submitter get half the points; the tier gain is unchanged). Unrelated to Spookify Tinder: an FMK choice is not a swipe.
 
 **FMK** — One round of three songs and the three choices made on them: sing, listen, delete.
 

@@ -98,8 +98,8 @@ same sum the pass shows. Admins add, edit and delete levels on the Admin page; m
 Apply `20261030_add_spookify_fmk.sql` for Spookify FMK. A user's tier per song lives in
 `spookify_fmk_tiers` (points from sing and listen, plus a deleted flag) and the songs that
 already shared a round in `spookify_fmk_pairs`; both are readable only by their owner and
-written only by `submit_spookify_fmk`, which re-checks that the three songs share a tier,
-have never met, are not the caller's own, and then awards the round's points.
+written only by `submit_spookify_fmk`, which re-checks that the three songs are the dealt trio,
+have never met, and then awards the round's points.
 `next_spookify_fmk` deals a random trio from the lowest tier that still has one.
 
 Apply `20261031_spookify_game_scores.sql` for per-game scores. `users` keeps three
@@ -115,6 +115,17 @@ holds what a song has earned for its submitter (right swipe 1, sing 1, listen 0.
 only by `private.award_song` from the swipe and FMK functions, and it is the number the song
 leaderboard ranks by. The migration also rebuilds each submitter's score from those points,
 so a left swipe no longer pays the submitter.
+
+Apply `20261045_fmk_trio_skips_own_songs.sql` for stored trios, FMK skips and own songs in FMK.
+`spookify_fmk_trios` holds the one trio each user is currently dealt (in display order); it is
+dealt by `next_spookify_fmk`, kept across refreshes and devices, and cleared by
+`submit_spookify_fmk` or `skip_spookify_fmk`. Its song foreign keys cascade, so a removed song,
+a deleted account or the Spookify reset drops the trio and a new one is dealt. `submit_spookify_fmk`
+accepts only the dealt trio. `battle_pass_levels.fmk_skips` is the daily skips a milestone adds;
+skips are logged in `spookify_fmk_skips` and counted from `private.limit_day_start()` like the other
+daily limits (`my_fmk_skips` reports them). A user's own songs may be dealt; voting on one pays the
+song and its submitter half (sing 0.5, listen 0.25) while the tier gain stays full. That quarter point
+is why the score columns and `spookify_songs.points` are `numeric(8,2)`.
 
 Searching Spotify goes through the `spookify-search` Edge Function so the Spotify
 client secret stays on the server; it uses the Client Credentials flow, which reaches

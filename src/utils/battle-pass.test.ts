@@ -50,9 +50,9 @@ describe('buildTrack', () => {
 
 describe('reward icons', () => {
   const levels = [
-    { id: 'a', xp_required: 200, bonus_songs: 1, bonus_fights: 0 },
-    { id: 'b', xp_required: 220, bonus_songs: 2, bonus_fights: 0 },
-    { id: 'c', xp_required: 1000, bonus_songs: 1, bonus_fights: 0 },
+    { id: 'a', xp_required: 200, bonus_songs: 1, bonus_fights: 0, fmk_skips: 0 },
+    { id: 'b', xp_required: 220, bonus_songs: 2, bonus_fights: 0, fmk_skips: 0 },
+    { id: 'c', xp_required: 1000, bonus_songs: 1, bonus_fights: 0, fmk_skips: 0 },
   ]
 
   it('scales the bar to the highest milestone when it passes the track total', () => {
@@ -62,7 +62,7 @@ describe('reward icons', () => {
   })
 
   it('describes bonus fights next to bonus songs', () => {
-    const [group] = rewardGroups([{ id: 'f', xp_required: 100, bonus_songs: 0, bonus_fights: 2 }], 0, 1000)
+    const [group] = rewardGroups([{ id: 'f', xp_required: 100, bonus_songs: 0, bonus_fights: 2, fmk_skips: 0 }], 0, 1000)
     expect(describeRewardGroup(group)).toBe('+2 fights per day · Unlocked at 100 XP')
   })
 
@@ -85,21 +85,21 @@ describe('reward icons', () => {
 
 describe('levelStatus', () => {
   const levels = [
-    { id: 'b', xp_required: 500, bonus_songs: 2, bonus_fights: 0 },
-    { id: 'a', xp_required: 200, bonus_songs: 1, bonus_fights: 0 },
-    { id: 'c', xp_required: 1000, bonus_songs: 3, bonus_fights: 0 },
+    { id: 'b', xp_required: 500, bonus_songs: 2, bonus_fights: 0, fmk_skips: 0 },
+    { id: 'a', xp_required: 200, bonus_songs: 1, bonus_fights: 0, fmk_skips: 0 },
+    { id: 'c', xp_required: 1000, bonus_songs: 3, bonus_fights: 0, fmk_skips: 0 },
   ]
 
   it('is level 0 with no bonus below the first threshold', () => {
-    expect(levelStatus(199, levels)).toEqual({ level: 0, bonusSongs: 0, bonusFights: 0, next: levels[1] })
+    expect(levelStatus(199, levels)).toEqual({ level: 0, bonusSongs: 0, bonusFights: 0, fmkSkips: 0, next: levels[1] })
   })
 
   it('stacks bonuses of every reached level, whatever the input order', () => {
-    expect(levelStatus(500, levels)).toEqual({ level: 2, bonusSongs: 3, bonusFights: 0, next: levels[2] })
+    expect(levelStatus(500, levels)).toEqual({ level: 2, bonusSongs: 3, bonusFights: 0, fmkSkips: 0, next: levels[2] })
   })
 
   it('has no next level at the top', () => {
-    expect(levelStatus(5000, levels)).toEqual({ level: 3, bonusSongs: 6, bonusFights: 0, next: null })
+    expect(levelStatus(5000, levels)).toEqual({ level: 3, bonusSongs: 6, bonusFights: 0, fmkSkips: 0, next: null })
   })
 })
 
