@@ -139,11 +139,6 @@
   background: rgba(139, 92, 246, 0.25);
 }
 
-.spookify-fmk-tiers {
-  gap: 0.5rem;
-  margin: 0;
-}
-
 @media (min-width: 768px) {
   .spookify-card {
     max-width: 420px;

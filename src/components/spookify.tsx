@@ -90,7 +90,6 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
   const [drag, setDrag] = useState(0)
 
   const [fmkSongs, setFmkSongs] = useState<FmkSong[]>([])
-  const [maxTier, setMaxTier] = useState(0)
   const [skips, setSkips] = useState<FmkSkips | null>(null)
   const [isSkipping, setIsSkipping] = useState(false)
   const [assignment, setAssignment] = useState<Record<string, FmkChoice | undefined>>({})
@@ -124,9 +123,8 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
     let cancelled = false
 
     const loadFmk = async () => {
-      const [round, max, skipRows] = await Promise.all([
+      const [round, skipRows] = await Promise.all([
         supabase.rpc('next_spookify_fmk'),
-        supabase.rpc('spookify_fmk_max_tier'),
         supabase.rpc('my_fmk_skips'),
       ])
       if (cancelled) return
@@ -134,7 +132,6 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
       setFmkError(round.error ? describeSpookifyError(round.error) : '')
       setFmkSongs(round.error ? [] : ((round.data ?? []) as FmkSong[]))
       setAssignment({})
-      setMaxTier(typeof max.data === 'number' ? max.data : 0)
       setSkips(skipRows.error ? null : (((skipRows.data ?? []) as FmkSkips[])[0] ?? null))
       setIsLoadingFmk(false)
     }
@@ -519,12 +516,8 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
             earns +0.5. Your own songs can show up too, but they pay only half.
           </GameNote>
           <p className="muted">
-            Give each song a different choice: sing, listen or delete. Sing and listen move a song up a tier; delete
+            Give each song a different choice: sing, listen or delete. Sing and listen add points to a song; delete
             removes it from your rounds. You keep this trio until you lock it in{skips && skips.skips_total > 0 ? ' or skip it' : ''}.
-          </p>
-          <p className="row spookify-fmk-tiers" data-testid="spookify-fmk-tiers">
-            <span className="pill">Current tier {fmkSongs[0]?.tier ?? '–'}</span>
-            <span className="pill">Max tier {maxTier}</span>
           </p>
 
           {fmkError && <p role="alert" className="form-error">{fmkError}</p>}
@@ -550,6 +543,9 @@ export function Spookify({ currentUserId, panel, onPanelChange }: SpookifyProps)
                       <small>
                         {fmkSong.artist}
                         {fmkSong.added_by === currentUserId && ' · 🎃 your song, pays half'}
+                      </small>
+                      <small data-testid="spookify-fmk-song-points">
+                        ⭐ {formatSpookifyScore(fmkSong.points)} points collected
                       </small>
                     </span>
                     <span className="row spookify-fmk-choices" role="group" aria-label={`Choice for ${fmkSong.title}`}>

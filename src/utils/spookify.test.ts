@@ -6,7 +6,6 @@ import {
   describeSpookifyError,
   fmkAssignmentComplete,
   fmkSubmitterReward,
-  fmkTierPoints,
   FMK_PLAYER_REWARD,
   formatSpookifyScore,
   markAlreadyAdded,
@@ -48,12 +47,6 @@ describe('fmk', () => {
     expect(fmkSubmitterReward('sing')).toBe(1)
     expect(fmkSubmitterReward('listen')).toBe(0.5)
     expect(fmkSubmitterReward('delete')).toBe(0)
-  })
-
-  it('moves songs up two tiers for sing and one for listen', () => {
-    expect(fmkTierPoints('sing')).toBe(2)
-    expect(fmkTierPoints('listen')).toBe(1)
-    expect(fmkTierPoints('delete')).toBe(0)
   })
 
   it('is complete only when each song has its own distinct choice', () => {

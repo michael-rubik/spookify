@@ -79,6 +79,7 @@ $$;
 revoke all on function private.draw_fmk_trio(uuid, uuid[]), private.fmk_skip_limit(uuid) from public, anon, authenticated;
 
 -- The caller's current trio, dealt on first use and kept until it is locked in or skipped.
+drop function if exists public.next_spookify_fmk();
 create or replace function public.next_spookify_fmk()
 returns table(
   id uuid,

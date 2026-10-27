@@ -15,7 +15,7 @@ const migrations = [
   'supabase/migrations/20261032_spookify_song_points.sql',
   'supabase/migrations/20261033_songmaster_badge.sql',
   'supabase/migrations/20261045_fmk_trio_skips_own_songs.sql',
-  'supabase/migrations/20261051_fmk_random_trio_draw.sql',
+  'supabase/migrations/20261051_fmk_without_tiers.sql',
 ].map((path) => readFileSync(path, 'utf8'))
 
 describe.each([
@@ -49,8 +49,8 @@ describe.each([
     if (applyMigrations) for (const migration of migrations) await db.exec(migration)
     await db.exec('grant all on all tables in schema public to authenticated, service_role')
     // The pool is written only through the definer functions, exactly as in a deployed project.
-    await db.exec('revoke all on public.spookify_songs, public.spookify_swipes, public.spookify_fmk_tiers, public.spookify_fmk_pairs from authenticated')
-    await db.exec('grant select on public.spookify_songs, public.spookify_swipes, public.spookify_fmk_tiers, public.spookify_fmk_pairs to authenticated')
+    await db.exec('revoke all on public.spookify_songs, public.spookify_swipes, public.spookify_fmk_deleted from authenticated')
+    await db.exec('grant select on public.spookify_songs, public.spookify_swipes to authenticated')
   }, 20000)
   afterAll(async () => { await db.close() })
 
@@ -125,7 +125,9 @@ describe.each([
   describe('fmk', () => {
     const nextFmk = async (user: string) => {
       await asUser(user)
-      const { rows } = await db.query<{ id: string; tier: number }>('select id, tier from public.next_spookify_fmk()')
+      const { rows } = await db.query<{ id: string; points: number }>(
+        'select id, points::float8 as points from public.next_spookify_fmk()',
+      )
       return rows
     }
     const submit = async (user: string, sing: string, listen: string, del: string) => {
@@ -147,7 +149,7 @@ describe.each([
       expect(await nextFmk(ben)).toHaveLength(3)
     })
 
-    it('pays the player a point and the submitter for sing and listen, and tiers the songs', async () => {
+    it('pays the player a point and the submitter for sing and listen, and removes the deleted song', async () => {
       const [first, second, third] = await addThree()
       await nextFmk(ben)
       await submit(ben, first, second, third)
@@ -159,20 +161,13 @@ describe.each([
       expect(await songPoints(second)).toBe(0.5)
       expect(await songPoints(third)).toBe(0)
       await db.exec('reset role')
-      const { rows } = await db.query<{ song_id: string; points: number; deleted: boolean }>(
-        'select song_id, points, deleted from public.spookify_fmk_tiers where user_id = $1', [ben],
+      const { rows } = await db.query<{ user_id: string; song_id: string }>(
+        'select user_id, song_id from public.spookify_fmk_deleted',
       )
-      expect(Object.fromEntries(rows.map((row) => [row.song_id, [row.points, row.deleted]]))).toEqual({
-        [first]: [2, false],
-        [second]: [1, false],
-        [third]: [0, true],
-      })
-      await asUser(ben)
-      const { rows: max } = await db.query<{ max: number }>('select public.spookify_fmk_max_tier() as max')
-      expect(max[0].max).toBe(2)
+      expect(rows).toEqual([{ user_id: ben, song_id: third }])
     })
 
-    it('never matches songs that already faced each other and keeps tiers per user', async () => {
+    it('never deals a deleted song again, per user, so a matched trio cannot return', async () => {
       const [first, second, third] = await addThree()
       await nextFmk(ben)
       await submit(ben, first, second, third)
@@ -180,18 +175,18 @@ describe.each([
       expect(await nextFmk(cat)).toHaveLength(3)
     })
 
-    it('draws from the lowest tier that still has an unmatched trio', async () => {
-      const songs = [
-        ...(await addThree()),
-        await addSong(ann, 'a4'),
-        await addSong(ann, 'a5'),
-        await addSong(ann, 'a6'),
-      ]
-      const dealt = (await nextFmk(ben)).map((row) => row.id)
-      await submit(ben, dealt[0], dealt[1], dealt[2])
-      const round = await nextFmk(ben)
-      expect(round.map((row) => row.id).sort()).toEqual(songs.filter((id) => !dealt.includes(id)).sort())
-      expect(new Set(round.map((row) => row.tier))).toEqual(new Set([0]))
+    it('deals songs that were sung or listened to again and shows the points they collected', async () => {
+      await addThree()
+      await addSong(ann, 'a4')
+      const dealt = await nextFmk(ben)
+      expect(dealt.map((row) => row.points)).toEqual([0, 0, 0])
+      const [sing, listen, remove] = dealt.map((row) => row.id)
+      await submit(ben, sing, listen, remove)
+      const next = await nextFmk(ben)
+      expect(next).toHaveLength(3)
+      expect(next.map((row) => row.id)).not.toContain(remove)
+      expect(next.find((row) => row.id === sing)?.points).toBe(1)
+      expect(next.find((row) => row.id === listen)?.points).toBe(0.5)
     })
 
     it('keeps the dealt trio, in the same order, until it is locked in', async () => {
@@ -224,7 +219,7 @@ describe.each([
       await expect(submit(ben, dealt[0], dealt[1], dealt[2])).rejects.toThrow('not your current trio')
     })
 
-    it('deals your own songs and pays half for voting on them, with full tier gains', async () => {
+    it('deals your own songs and pays half for voting on them', async () => {
       const [first, second, third] = [
         await addSong(ann, 'a1'),
         await addSong(ann, 'a2'),
@@ -237,11 +232,6 @@ describe.each([
       expect(await scoreOf(ann, 'submitter_score')).toBe(0.75)
       expect(await scoreOf(ann, 'fmk_score')).toBe(1)
       expect(await scoreOf(ann)).toBe(1.75)
-      await db.exec('reset role')
-      const { rows } = await db.query<{ song_id: string; points: number }>(
-        'select song_id, points from public.spookify_fmk_tiers where user_id = $1 and not deleted', [ann],
-      )
-      expect(Object.fromEntries(rows.map((row) => [row.song_id, row.points]))).toEqual({ [first]: 2, [second]: 1 })
     })
 
     it('pays half only for the own song when a trio mixes own and other songs', async () => {
@@ -253,31 +243,6 @@ describe.each([
       expect(await songPoints(others[0])).toBe(0.5)
       expect(await scoreOf(ann, 'submitter_score')).toBe(0.5)
       expect(await scoreOf(ben, 'submitter_score')).toBe(0.5)
-    })
-
-    it('is wiped, with the add-song points, by the one-off reset while songs and tinder stay', async () => {
-      const [first, second, third] = await addThree()
-      await swipe(cat, first, 'right')
-      await nextFmk(ben)
-      await submit(ben, first, second, third)
-      await db.exec('reset role')
-      await db.exec(readFileSync('supabase/migrations/20261046_reset_fmk_and_add_song_points.sql', 'utf8'))
-      expect(await scoreOf(ben, 'fmk_score')).toBe(0)
-      expect(await scoreOf(ann, 'submitter_score')).toBe(0)
-      expect(await scoreOf(cat)).toBe(1)
-      expect(await songPoints(first)).toBe(0)
-
-      await db.exec(readFileSync('supabase/migrations/20261047_restore_add_song_tinder_points.sql', 'utf8'))
-      expect(await songPoints(first)).toBe(1)
-      expect(await scoreOf(ann, 'submitter_score')).toBe(1)
-      expect(await scoreOf(ann)).toBe(1)
-      expect(await scoreOf(ben)).toBe(0)
-      const { rows } = await db.query<{ songs: number; tiers: number; trios: number }>(`
-        select (select count(*)::int from public.spookify_songs) as songs,
-               (select count(*)::int from public.spookify_fmk_tiers) as tiers,
-               (select count(*)::int from public.spookify_fmk_trios) as trios`)
-      expect(rows[0]).toEqual({ songs: 3, tiers: 0, trios: 0 })
-      expect(await nextFmk(ben)).toHaveLength(3)
     })
 
     describe('skips', () => {
@@ -334,11 +299,11 @@ describe.each([
       })
     })
 
-    it('does not let a client write tiers or pairs directly', async () => {
+    it('does not let a client write the deleted songs directly', async () => {
       const [first] = await addThree()
       await asUser(ben)
       await expect(
-        db.query('insert into public.spookify_fmk_tiers (user_id, song_id, points) values ($1, $2, 99)', [ben, first]),
+        db.query('insert into public.spookify_fmk_deleted (user_id, song_id) values ($1, $2)', [ben, first]),
       ).rejects.toThrow()
     })
   })

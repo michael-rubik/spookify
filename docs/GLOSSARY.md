@@ -101,17 +101,11 @@ _Avoid_: Poll (for the event), election
 
 **Spookify FMK score** — Points a user earns by playing FMKs: one point per round.
 
-**Spookify FMK** — The place where a user is shown three pool songs of the same tier and gives each a different choice. A user's own songs may be dealt to them, and voting on one pays half (the song and its submitter get half the points; the tier gain is unchanged). Unrelated to Spookify Tinder: an FMK choice is not a swipe.
+**Spookify FMK** — The place where a user is shown three random pool songs and gives each a different choice. A user's own songs may be dealt to them, and voting on one pays half (the song and its submitter get half the points). Each song shows the points it has collected so far. Unrelated to Spookify Tinder: an FMK choice is not a swipe.
 
 **FMK** — One round of three songs and the three choices made on them: sing, listen, delete.
 
-**Sing / Listen / Delete** — The three choices in an FMK. Sing adds two points to the song's tier for that user, listen adds one, and delete removes the song from that user's future FMKs. Sing earns the song's submitter a full point and listen half a point; delete earns them nothing.
-
-**Tier** — A user's own points total for one pool song, built up from their sing and listen choices. Every song starts at tier zero. Two songs only meet in an FMK when they share a tier for that user, and never meet again once they have shared an FMK.
-
-**Current tier** — The lowest tier for which a user still has three songs that can be matched. Every FMK is drawn from it. Shown to the user next to their max tier.
-
-**Max tier** — The highest tier any of a user's songs has reached.
+**Sing / Listen / Delete** — The three choices in an FMK. Delete removes the song from that user's future FMKs, so the same trio can never be dealt again. Sing earns the song and its submitter a full point and listen half a point; delete earns them nothing.
 
 **Leaderboard** — A bar graph ranking users, showing the top ten plus the viewer's own row. The clicker view ranks by click count; Add song to game, Spookify Tinder and Spookify FMK each rank by their own score.
 

@@ -95,12 +95,8 @@ XP has reached (level 1 is the lowest threshold). XP is recomputed server-side b
 same sum the pass shows. Admins add, edit and delete levels on the Admin page; members can read them.
 `my_song_allowance` returns the caller's XP, level, limit and songs added today.
 
-Apply `20261030_add_spookify_fmk.sql` for Spookify FMK. A user's tier per song lives in
-`spookify_fmk_tiers` (points from sing and listen, plus a deleted flag) and the songs that
-already shared a round in `spookify_fmk_pairs`; both are readable only by their owner and
-written only by `submit_spookify_fmk`, which re-checks that the three songs are the dealt trio,
-have never met, and then awards the round's points.
-`next_spookify_fmk` deals a random trio from the lowest tier that still has one.
+Apply `20261030_add_spookify_fmk.sql` for Spookify FMK. `submit_spookify_fmk` re-checks that the
+three songs are the dealt trio and then awards the round's points.
 
 Apply `20261031_spookify_game_scores.sql` for per-game scores. `users` keeps three
 server-written columns, `submitter_score` (Add song to game), `tinder_score` and
@@ -124,8 +120,16 @@ a deleted account or the Spookify reset drops the trio and a new one is dealt. `
 accepts only the dealt trio. `battle_pass_levels.fmk_skips` is the daily skips a milestone adds;
 skips are logged in `spookify_fmk_skips` and counted from `private.limit_day_start()` like the other
 daily limits (`my_fmk_skips` reports them). A user's own songs may be dealt; voting on one pays the
-song and its submitter half (sing 0.5, listen 0.25) while the tier gain stays full. That quarter point
+song and its submitter half (sing 0.5, listen 0.25). That quarter point
 is why the score columns and `spookify_songs.points` are `numeric(8,2)`.
+
+Apply `20261051_fmk_without_tiers.sql` to drop FMK tiers. `spookify_fmk_tiers` and
+`spookify_fmk_pairs` are gone; `spookify_fmk_deleted` holds the songs each user deleted (no client
+access, written only by `submit_spookify_fmk`). `private.draw_fmk_trio` samples three random
+songs the user has not deleted, so a matched trio can never return, and `next_spookify_fmk`
+returns each song's collected `points` (`spookify_songs.points`) for the FMK view. Every locked-in
+round deletes one song, so the `fmk` badge counts a user's `spookify_fmk_deleted` rows.
+`spookify_fmk_max_tier` is removed.
 
 Apply `20261048_karaoke_toggle.sql` to let admins turn karaoke off. `app_settings.karaoke_enabled`
 (default on) is read with `karaoke_enabled()` and written by the admin-only `set_karaoke_enabled`;

@@ -41,6 +41,10 @@ describe.each([
       grant all on all tables in schema storage to authenticated, service_role;
     `)
     await db.exec(schema)
+    // The replayed migrations still read the pair table that the final schema no longer has.
+    if (applyMigrations) {
+      await db.exec('create table if not exists public.spookify_fmk_pairs (user_id uuid, song_a uuid, song_b uuid)')
+    }
     if (applyMigrations) for (const migration of migrations) await db.exec(migration)
     await db.exec('grant all on all tables in schema public to authenticated, service_role')
   }, 20000)

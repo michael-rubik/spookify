@@ -37,6 +37,7 @@ on public.spookify_fmk_pairs for select to authenticated
 using (public.account_is_active() and user_id = auth.uid());
 
 -- Three songs from the lowest tier that still has a trio never matched before; none of them is the caller's own.
+drop function if exists public.next_spookify_fmk();
 create or replace function public.next_spookify_fmk()
 returns table(
   id uuid,
