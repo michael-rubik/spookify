@@ -2519,36 +2519,50 @@ alter table public.spookify_fmk_trios enable row level security;
 alter table public.spookify_fmk_skips enable row level security;
 revoke all on public.spookify_fmk_trios, public.spookify_fmk_skips from anon, authenticated;
 
--- Three shuffled songs from the lowest tier that still has a trio never matched before, skipping the
--- songs the user deleted and any trio equal to p_exclude. Null when no such trio exists.
+-- Three random songs from the lowest tier that has at least three, skipping the songs the user deleted and
+-- retrying a few times to avoid a trio equal to p_exclude. Null when no such trio exists.
 create or replace function private.draw_fmk_trio(p_user uuid, p_exclude uuid[])
 returns uuid[]
-language sql security definer set search_path = ''
+language plpgsql security definer set search_path = ''
 as $$
-  with candidates as (
-    select s.id, coalesce(t.points, 0) as tier
+declare
+  lowest_tier integer;
+  drawn uuid[];
+begin
+  select c.tier into lowest_tier
+  from (
+    select coalesce(t.points, 0) as tier
     from public.spookify_songs s
     left join public.spookify_fmk_tiers t on t.song_id = s.id and t.user_id = p_user
     where not coalesce(t.deleted, false)
-  ),
-  trio as (
-    select a.id as a_id, b.id as b_id, c.id as c_id, a.tier
-    from candidates a
-    join candidates b on b.tier = a.tier and b.id > a.id
-    join candidates c on c.tier = a.tier and c.id > b.id
-    where not exists (
-      select 1 from public.spookify_fmk_pairs p
-      where p.user_id = p_user
-        and ((p.song_a = a.id and p.song_b = b.id)
-          or (p.song_a = a.id and p.song_b = c.id)
-          or (p.song_a = b.id and p.song_b = c.id))
-    )
-      and (p_exclude is null or array[a.id, b.id, c.id] <> p_exclude)
-    order by a.tier, random()
-    limit 1
-  )
-  select array(select x from unnest(array[trio.a_id, trio.b_id, trio.c_id]) x order by random())
-  from trio
+  ) c
+  group by c.tier
+  having count(*) >= 3
+  order by c.tier
+  limit 1;
+
+  if lowest_tier is null then
+    return null;
+  end if;
+
+  for attempt in 1..5 loop
+    select array_agg(x.id) into drawn
+    from (
+      select s.id
+      from public.spookify_songs s
+      left join public.spookify_fmk_tiers t on t.song_id = s.id and t.user_id = p_user
+      where not coalesce(t.deleted, false) and coalesce(t.points, 0) = lowest_tier
+      order by random()
+      limit 3
+    ) x;
+
+    if p_exclude is null or (select array_agg(y order by y) from unnest(drawn) y) <> p_exclude then
+      return drawn;
+    end if;
+  end loop;
+
+  return null;
+end;
 $$;
 
 create or replace function private.fmk_skip_limit(p_user uuid)

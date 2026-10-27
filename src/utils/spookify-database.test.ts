@@ -15,6 +15,7 @@ const migrations = [
   'supabase/migrations/20261032_spookify_song_points.sql',
   'supabase/migrations/20261033_songmaster_badge.sql',
   'supabase/migrations/20261045_fmk_trio_skips_own_songs.sql',
+  'supabase/migrations/20261051_fmk_random_trio_draw.sql',
 ].map((path) => readFileSync(path, 'utf8'))
 
 describe.each([
